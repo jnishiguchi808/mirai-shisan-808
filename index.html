@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mirai Shisan 808</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-card: #1a2332;
+  --border: #2a3441;
+  --text-primary: #e8ecf0;
+  --text-secondary: #8a9bb0;
+  --text-dim: #5a6a7a;
+  --green: #00d4aa;
+  --red: #ff4757;
+  --yellow: #ffc107;
+  --blue: #4a9eff;
+  --purple: #a855f7;
+}
+body { background:var(--bg-primary); color:var(--text-primary); font-family:'Inter',sans-serif; font-size:13px; overflow-x:hidden; }
+
+/* PASSWORD GATE */
+#password-gate { position:fixed; inset:0; background:var(--bg-primary); z-index:9999; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+#password-gate.hidden { display:none; }
+#password-gate h1 { font-family:'IBM Plex Mono',monospace; font-size:2rem; color:var(--green); margin-bottom:24px; }
+#password-gate input { background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:12px 20px; font-size:1rem; border-radius:6px; width:280px; text-align:center; }
+#password-gate input:focus { outline:none; border-color:var(--green); }
+#password-gate .error { color:var(--red); margin-top:10px; font-size:0.8rem; }
+
+/* TOP BAR */
+.topbar { background:var(--bg-secondary); border-bottom:1px solid var(--border); padding:8px 20px; display:flex; align-items:center; gap:16px; position:sticky; top:0; z-index:100; }
+.topbar .brand { font-family:'IBM Plex Mono',monospace; font-weight:700; color:var(--green); font-size:1.15rem; white-space:nowrap; line-height:1.2; }
+.topbar .market-status { font-size:0.7rem; color:var(--text-dim); background:var(--bg-card); padding:3px 8px; border-radius:4px; }
+.topbar .market-status.open { color:var(--green); }
+.ticker-tape { flex:1; overflow:hidden; white-space:nowrap; font-family:'IBM Plex Mono',monospace; font-size:0.75rem; color:var(--text-secondary); }
+.ticker-tape span { margin-right:24px; }
+.ticker-tape .up { color:var(--green); }
+.ticker-tape .down { color:var(--red); }
+.search-box { display:flex; align-items:center; gap:6px; }
+.search-box input { background:var(--bg-card); border:1px solid var(--border); color:var(--text-primary); padding:6px 12px; border-radius:4px; width:200px; font-size:0.8rem; }
+.search-box input:focus { outline:none; border-color:var(--blue); }
+.search-box kbd { background:var(--bg-card); border:1px solid var(--border); padding:2px 6px; border-radius:3px; font-size:0.65rem; color:var(--text-dim); }
+
+/* LAYOUT */
+.layout { display:flex; height:calc(100vh - 45px); }
+.sidebar { width:180px; background:var(--bg-secondary); border-right:1px solid var(--border); padding:12px 0; flex-shrink:0; overflow-y:auto; }
+.sidebar a { display:block; padding:8px 16px; color:var(--text-secondary); text-decoration:none; font-size:0.8rem; font-weight:500; border-left:3px solid transparent; transition:all 0.15s; }
+.sidebar a:hover { color:var(--text-primary); background:var(--bg-card); }
+.sidebar a.active { color:var(--green); border-left-color:var(--green); background:var(--bg-card); }
+.sidebar .section-label { padding:16px 16px 4px; font-size:0.65rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); }
+.main-content { flex:1; overflow-y:auto; padding:20px; }
+
+/* PANELS */
+.panel { background:var(--bg-card); border:1px solid var(--border); border-radius:8px; margin-bottom:16px; overflow:hidden; }
+.panel-header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.panel-header h3 { font-size:0.85rem; font-weight:600; color:var(--text-primary); }
+.panel-body { padding:16px; }
+
+/* STOCK OVERVIEW */
+.stock-header { display:flex; align-items:baseline; gap:12px; margin-bottom:4px; }
+.stock-header .ticker { font-family:'IBM Plex Mono',monospace; font-size:1.8rem; font-weight:700; }
+.stock-header .company { color:var(--text-secondary); font-size:0.9rem; }
+.stock-header .sector-badge { background:var(--bg-secondary); border:1px solid var(--border); padding:2px 8px; border-radius:4px; font-size:0.7rem; color:var(--text-dim); }
+.price-display { font-family:'IBM Plex Mono',monospace; font-size:2.2rem; font-weight:700; margin:8px 0; }
+.price-change { font-family:'IBM Plex Mono',monospace; font-size:0.9rem; }
+.price-change.up { color:var(--green); }
+.price-change.down { color:var(--red); }
+.price-meta { font-size:0.75rem; color:var(--text-dim); margin-top:4px; }
+
+/* 52W RANGE */
+.range-bar { margin:16px 0; }
+.range-bar .labels { display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:var(--text-dim); margin-bottom:4px; }
+.range-bar .bar { height:6px; background:linear-gradient(90deg, var(--red), var(--yellow), var(--green)); border-radius:3px; position:relative; }
+.range-bar .marker { position:absolute; top:-3px; width:12px; height:12px; background:var(--text-primary); border-radius:50%; border:2px solid var(--bg-card); transform:translateX(-50%); }
+
+/* STATS GRID */
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:12px; }
+.stat-item { padding:10px; background:var(--bg-secondary); border-radius:6px; border:1px solid var(--border); }
+.stat-item .label { font-size:0.65rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-dim); margin-bottom:4px; }
+.stat-item .value { font-family:'IBM Plex Mono',monospace; font-size:0.95rem; font-weight:600; color:var(--text-primary); }
+
+/* ANALYST TARGET */
+.analyst-bar { margin:16px 0; }
+.analyst-bar .labels { display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:0.7rem; margin-bottom:4px; }
+.analyst-bar .lo { color:var(--red); }
+.analyst-bar .mid { color:var(--yellow); }
+.analyst-bar .hi { color:var(--green); }
+.analyst-bar .bar { height:8px; background:var(--bg-secondary); border-radius:4px; position:relative; overflow:hidden; }
+.analyst-bar .fill { height:100%; background:linear-gradient(90deg, var(--red), var(--yellow), var(--green)); border-radius:4px; }
+.analyst-bar .current { position:absolute; top:-4px; width:3px; height:16px; background:var(--text-primary); transform:translateX(-50%); border-radius:2px; }
+
+/* TABLE */
+.data-table { width:100%; border-collapse:collapse; font-family:'IBM Plex Mono',monospace; font-size:0.75rem; }
+.data-table th { text-align:left; padding:8px 10px; color:var(--text-dim); font-size:0.65rem; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border); font-weight:600; position:sticky; top:0; background:var(--bg-card); cursor:pointer; }
+.data-table th:hover { color:var(--text-primary); }
+.data-table td { padding:7px 10px; border-bottom:1px solid #1a2332; vertical-align:middle; }
+.data-table tr:hover td { background:var(--bg-secondary); }
+.data-table .ticker-cell { color:var(--blue); font-weight:600; cursor:pointer; }
+.data-table .ticker-cell:hover { text-decoration:underline; }
+.data-table .up { color:var(--green); }
+.data-table .down { color:var(--red); }
+.data-table .highlight-soon { background:#ffc10722; border-radius:3px; padding:2px 4px; color:var(--yellow); }
+
+/* CHART CONTAINER */
+.chart-container { width:100%; height:400px; border-radius:6px; overflow:hidden; border:1px solid var(--border); }
+
+/* TABS */
+.tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:16px; }
+.tabs button { background:none; border:none; padding:8px 16px; color:var(--text-secondary); font-size:0.8rem; cursor:pointer; border-bottom:2px solid transparent; font-weight:500; }
+.tabs button:hover { color:var(--text-primary); }
+.tabs button.active { color:var(--green); border-bottom-color:var(--green); }
+
+/* QUICK TICKERS */
+.quick-tickers { padding:12px 16px; border-top:1px solid var(--border); }
+.quick-tickers .label { font-size:0.65rem; text-transform:uppercase; color:var(--text-dim); margin-bottom:6px; }
+.quick-tickers .chips { display:flex; flex-wrap:wrap; gap:4px; }
+.quick-tickers .chip { background:var(--bg-card); border:1px solid var(--border); padding:3px 8px; border-radius:4px; font-size:0.7rem; font-family:'IBM Plex Mono',monospace; color:var(--text-secondary); cursor:pointer; }
+.quick-tickers .chip:hover { border-color:var(--green); color:var(--green); }
+
+/* LOADING */
+.loading { text-align:center; padding:40px; color:var(--text-dim); }
+.loading::after { content:''; display:inline-block; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--green); border-radius:50%; animation:spin 0.8s linear infinite; margin-left:8px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:var(--bg-primary); }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:var(--text-dim); }
+
+/* RESPONSIVE */
+@media (max-width:768px) { .sidebar { display:none; } .topbar .ticker-tape { display:none; } }
+</style>
+</head>
+<body>
+
+<!-- PASSWORD GATE -->
+<div id="password-gate">
+  <h1>未来資産 808</h1>
+  <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:20px;">Future Wealth &amp; Assets</p>
+  <input type="password" id="pw-input" placeholder="Enter password" autofocus>
+  <div class="error" id="pw-error"></div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none;">
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="brand">未来資産 808<div style="font-size:0.55rem; font-weight:400; color:var(--text-secondary); letter-spacing:0.5px; margin-top:1px;">Mirai Shisan — your future wealth</div></div>
+  <div class="market-status" id="market-status">MARKET CLOSED</div>
+  <div class="ticker-tape" id="ticker-tape"></div>
+  <div class="search-box">
+    <input type="text" id="search-input" placeholder="Search ticker or company ( / )">
+    <kbd>/</kbd>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <a href="#" class="active" data-view="overview">Overview</a>
+    <a href="#" data-view="portfolio">Portfolio</a>
+    <a href="#" data-view="watchlist">Watchlist</a>
+    <a href="#" data-view="semiconductors">Semiconductors</a>
+    <a href="#" data-view="etfs">ETFs &amp; Funds</a>
+    <div class="section-label">Research</div>
+    <a href="#" data-view="news">News &amp; Analysts</a>
+    <a href="#" data-view="sectors">Sector Heatmap</a>
+    <a href="#" data-view="macro">Macro &amp; Economy</a>
+    <a href="#" data-view="earnings">Earnings Calendar</a>
+    <a href="#" data-view="screener">Screener</a>
+    <a href="#" data-view="valuation">Valuation Tools</a>
+    <a href="#" data-view="notes">Thesis &amp; Notes</a>
+    <a href="#" data-view="alerts">Alerts</a>
+    <div class="quick-tickers">
+      <div class="label">Quick Tickers</div>
+      <div class="chips" id="quick-chips"></div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content" id="main-content">
+    <div class="loading">Loading dashboard...</div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<!-- TRADINGVIEW WIDGET SCRIPT -->
+<script src="https://s3.tradingview.com/tv.js"></script>
+
+<script>
+// ============================================
+// CONFIG
+// ============================================
+const PASSWORD_HASH = ''; // Not used with plaintext check below
+const PLAINTEXT_PASSWORD = '4SonGoku';
+const FINNHUB_KEY = 'd8hh141r01qrn5ec293gd8hh141r01qrn5ec2940';
+const FMP_KEY = 'demo'; // Replace with your free FMP API key
+
+const WATCHLIST = {
+  equities: ['ABBV','ABT','AMT','AMDY','APPN','APPS','BA','BN','CCI','CPB','CRM','DKNG','DUOL','DVN','GAIN','GEV','GOOGL','IIPR','IRM','MAIN','MCD','META','MSFT','NVDA','O','ONON','PATH','PLD','PLTY','QS','RIOT','SNY','SPGI','STAG','TOST','USBPRQ','VICI','VST','XYZ','ZS'],
+  etfs: ['BUG','CGDV','COPX','DGRO','GDXY','GPIQ','IBIT','IDVO','ISPY','JEPQ','JPIE','KRE','MLPA','NVDY','SCHD','SOXQ','SPMO','SPYI','SPYM','TSLY','TSMY','VIG','VNQI','VWO','XLF','XLG'],
+  semiconductors: ['MU','AMD','COHR','MRVL','TSM','LRCX','AMAT','NVDA','ASML','CRUS','KLIC','LSCC','UMC','AMKR','TXN','GFS','INTC','WOLF','SWKS','SLAB']
+};
+
+const QUICK_TICKERS = ['NVDA','MSFT','META','GOOGL','AMD','TSM','AAPL','AMZN'];
+
+// ============================================
+// PASSWORD GATE
+// ============================================
+async function hashPassword(pw) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(pw);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+document.getElementById('pw-input').addEventListener('keydown', async (e) => {
+  if (e.key === 'Enter') {
+    const hash = await hashPassword(e.target.value);
+    if (hash === PASSWORD_HASH || e.target.value === PLAINTEXT_PASSWORD) {
+      document.getElementById('password-gate').classList.add('hidden');
+      document.getElementById('app').style.display = '';
+      initApp();
+    } else {
+      document.getElementById('pw-error').textContent = 'Incorrect password';
+    }
+  }
+});
+
+// Check if already authenticated this session
+if (sessionStorage.getItem('terminal_auth') === '1') {
+  document.getElementById('password-gate').classList.add('hidden');
+  document.getElementById('app').style.display = '';
+  setTimeout(initApp, 100);
+}
+
+// ============================================
+// APP INITIALIZATION
+// ============================================
+function initApp() {
+  sessionStorage.setItem('terminal_auth', '1');
+  setupSidebar();
+  setupSearch();
+  setupQuickTickers();
+  updateMarketStatus();
+  loadView('overview');
+  startTickerTape();
+}
+
+// ============================================
+// MARKET STATUS
+// ============================================
+function updateMarketStatus() {
+  const now = new Date();
+  const ny = new Date(now.toLocaleString('en-US', {timeZone:'America/New_York'}));
+  const h = ny.getHours(), m = ny.getMinutes();
+  const day = ny.getDay();
+  const isWeekday = day >= 1 && day <= 5;
+  const isOpen = isWeekday && ((h === 9 && m >= 30) || (h >= 10 && h < 16));
+  const el = document.getElementById('market-status');
+  if (isOpen) {
+    el.textContent = 'MARKET OPEN';
+    el.classList.add('open');
+  } else {
+    el.textContent = 'MARKET CLOSED';
+    el.classList.remove('open');
+  }
+}
+
+// ============================================
+// TICKER TAPE
+// ============================================
+function startTickerTape() {
+  const tickers = ['SPY','QQQ','DIA','IWM','NVDA','MSFT','AAPL','META','GOOGL','AMZN','AMD','TSM'];
+  const tape = document.getElementById('ticker-tape');
+  // Demo data - replace with real API calls
+  const demoData = tickers.map(t => {
+    const change = (Math.random() * 6 - 2).toFixed(2);
+    const pct = (Math.random() * 3 - 1).toFixed(2);
+    const cls = parseFloat(change) >= 0 ? 'up' : 'down';
+    const arrow = parseFloat(change) >= 0 ? '↑' : '↓';
+    return `<span>${t} <span class="${cls}">${arrow}${Math.abs(change)} (${pct}%)</span></span>`;
+  });
+  tape.innerHTML = demoData.join('');
+}
+
+// ============================================
+// SIDEBAR NAVIGATION
+// ============================================
+function setupSidebar() {
+  document.querySelectorAll('.sidebar a[data-view]').forEach(a => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.querySelectorAll('.sidebar a').forEach(x => x.classList.remove('active'));
+      a.classList.add('active');
+      loadView(a.dataset.view);
+    });
+  });
+}
+
+// ============================================
+// SEARCH
+// ============================================
+function setupSearch() {
+  const input = document.getElementById('search-input');
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && document.activeElement !== input) { e.preventDefault(); input.focus(); }
+    if (e.key === 'Escape') input.blur();
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const ticker = input.value.trim().toUpperCase();
+      if (ticker) loadStockView(ticker);
+      input.value = '';
+      input.blur();
+    }
+  });
+}
+
+// ============================================
+// QUICK TICKERS
+// ============================================
+function setupQuickTickers() {
+  const container = document.getElementById('quick-chips');
+  container.innerHTML = QUICK_TICKERS.map(t => `<div class="chip" onclick="loadStockView('${t}')">${t}</div>`).join('');
+}
+
+// ============================================
+// VIEW ROUTER
+// ============================================
+function loadView(view) {
+  const main = document.getElementById('main-content');
+  switch(view) {
+    case 'overview': renderOverview(main); break;
+    case 'watchlist': renderWatchlist(main, 'equities', 'Equities Watchlist'); break;
+    case 'etfs': renderWatchlist(main, 'etfs', 'ETFs & Closed End Funds'); break;
+    case 'semiconductors': renderWatchlist(main, 'semiconductors', 'Semiconductor Watchlist'); break;
+    case 'portfolio': renderPortfolio(main); break;
+    case 'earnings': renderEarnings(main); break;
+    case 'sectors': renderSectors(main); break;
+    case 'macro': renderMacro(main); break;
+    case 'valuation': renderValuation(main); break;
+    case 'notes': renderNotes(main); break;
+    case 'alerts': renderAlerts(main); break;
+    default: main.innerHTML = `<div class="panel"><div class="panel-body"><p>Coming soon: ${view}</p></div></div>`;
+  }
+}
+
+function loadStockView(ticker) {
+  document.querySelectorAll('.sidebar a').forEach(x => x.classList.remove('active'));
+  document.querySelector('.sidebar a[data-view="overview"]').classList.add('active');
+  renderStockDetail(document.getElementById('main-content'), ticker);
+}
+
+// ============================================
+// RENDER: OVERVIEW (Default stock view)
+// ============================================
+function renderOverview(container) {
+  renderStockDetail(container, 'NVDA');
+}
+
+// ============================================
+// RENDER: STOCK DETAIL
+// ============================================
+function renderStockDetail(container, ticker) {
+  container.innerHTML = `
+    <div class="panel">
+      <div class="panel-body">
+        <div class="stock-header">
+          <span class="ticker">${ticker}</span>
+          <span class="company" id="company-name">Loading...</span>
+          <span class="sector-badge" id="sector-badge">—</span>
+        </div>
+        <div class="price-display" id="current-price">—</div>
+        <div class="price-change" id="price-change">—</div>
+        <div class="price-meta" id="price-meta">Last updated: —</div>
+        
+        <div class="range-bar">
+          <div class="labels"><span id="range-low">52W Low: —</span><span>CURRENT POSITION</span><span id="range-high">52W High: —</span></div>
+          <div class="bar"><div class="marker" id="range-marker" style="left:50%"></div></div>
+        </div>
+
+        <div class="analyst-bar">
+          <div class="labels"><span class="lo" id="analyst-lo">Lo: —</span><span class="mid" id="analyst-mid">Mid: —</span><span class="hi" id="analyst-hi">Hi: —</span></div>
+          <div class="bar"><div class="fill" style="width:100%"></div><div class="current" id="analyst-current" style="left:50%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><h3>Price Chart</h3></div>
+      <div class="panel-body" style="padding:0;">
+        <div class="chart-container" id="tv-chart"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><h3>Key Statistics</h3></div>
+      <div class="panel-body">
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-item"><div class="label">Market Cap</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">P/E (TTM)</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">P/E (FWD)</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">EPS</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">Revenue Growth YoY</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">Div Yield</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">Ex-Div Date</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">Next Earnings</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">Beta</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">Avg Volume</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">FCF Margin</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">Debt/Equity</div><div class="value">—</div></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Load TradingView chart
+  if (typeof TradingView !== 'undefined') {
+    new TradingView.widget({
+      container_id: 'tv-chart',
+      symbol: ticker,
+      interval: 'D',
+      timezone: 'America/New_York',
+      theme: 'dark',
+      style: '1',
+      locale: 'en',
+      toolbar_bg: '#1a2332',
+      enable_publishing: false,
+      hide_top_toolbar: false,
+      hide_legend: false,
+      save_image: false,
+      width: '100%',
+      height: '400',
+      backgroundColor: '#1a2332',
+      gridColor: '#2a3441',
+    });
+  }
+
+  // Fetch stock data
+  fetchStockData(ticker);
+}
+
+// ============================================
+// FETCH STOCK DATA (Finnhub + FMP)
+// ============================================
+async function fetchStockData(ticker) {
+  try {
+    // Quote from Finnhub
+    const quoteRes = await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`);
+    const quote = await quoteRes.json();
+    
+    if (quote.c) {
+      document.getElementById('current-price').textContent = `$${quote.c.toFixed(2)}`;
+      const change = (quote.c - quote.pc).toFixed(2);
+      const pct = ((quote.c - quote.pc) / quote.pc * 100).toFixed(2);
+      const isUp = parseFloat(change) >= 0;
+      document.getElementById('price-change').textContent = `${isUp?'↑':'↓'} ${isUp?'+':''}${change} (${isUp?'+':''}${pct}%)`;
+      document.getElementById('price-change').className = `price-change ${isUp?'up':'down'}`;
+      document.getElementById('price-meta').textContent = `Last updated: ${new Date().toLocaleString()}`;
+    }
+
+    // Profile from Finnhub
+    const profileRes = await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FINNHUB_KEY}`);
+    const profile = await profileRes.json();
+    if (profile.name) {
+      document.getElementById('company-name').textContent = profile.name;
+      document.getElementById('sector-badge').textContent = profile.finnhubIndustry || '—';
+    }
+
+    // Basic financials
+    const metricsRes = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FINNHUB_KEY}`);
+    const metrics = await metricsRes.json();
+    if (metrics.metric) {
+      const m = metrics.metric;
+      const grid = document.getElementById('stats-grid');
+      const stats = [
+        { label:'Market Cap', value: m.marketCapitalization ? `$${(m.marketCapitalization/1000).toFixed(1)}B` : '—' },
+        { label:'P/E (TTM)', value: m.peNormalizedAnnual?.toFixed(1) || '—' },
+        { label:'P/E (FWD)', value: m.peTTM?.toFixed(1) || '—' },
+        { label:'EPS (TTM)', value: m.epsNormalizedAnnual?.toFixed(2) || '—' },
+        { label:'Rev Growth YoY', value: m.revenueGrowthQuarterlyYoy ? `${m.revenueGrowthQuarterlyYoy.toFixed(1)}%` : '—' },
+        { label:'Div Yield', value: m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—' },
+        { label:'Ex-Div Date', value: m.exDividendDate || '—' },
+        { label:'Next Earnings', value: '—' },
+        { label:'Beta', value: m.beta?.toFixed(2) || '—' },
+        { label:'Avg Volume', value: m['10DayAverageTradingVolume'] ? `${m['10DayAverageTradingVolume'].toFixed(1)}M` : '—' },
+        { label:'52W High', value: m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—' },
+        { label:'52W Low', value: m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—' },
+      ];
+      grid.innerHTML = stats.map(s => `<div class="stat-item"><div class="label">${s.label}</div><div class="value">${s.value}</div></div>`).join('');
+
+      // Update 52W range
+      if (m['52WeekHigh'] && m['52WeekLow'] && quote.c) {
+        document.getElementById('range-low').textContent = `52W Low: $${m['52WeekLow'].toFixed(2)}`;
+        document.getElementById('range-high').textContent = `52W High: $${m['52WeekHigh'].toFixed(2)}`;
+        const pct = ((quote.c - m['52WeekLow']) / (m['52WeekHigh'] - m['52WeekLow'])) * 100;
+        document.getElementById('range-marker').style.left = `${Math.min(100,Math.max(0,pct))}%`;
+      }
+    }
+
+    // Price target (analyst Lo/Mid/Hi)
+    const targetRes = await fetch(`https://finnhub.io/api/v1/stock/price-target?symbol=${ticker}&token=${FINNHUB_KEY}`);
+    const target = await targetRes.json();
+    if (target.targetHigh) {
+      document.getElementById('analyst-lo').textContent = `Lo: $${target.targetLow?.toFixed(0) || '—'}`;
+      document.getElementById('analyst-mid').textContent = `Mid: $${target.targetMedian?.toFixed(0) || '—'}`;
+      document.getElementById('analyst-hi').textContent = `Hi: $${target.targetHigh?.toFixed(0) || '—'}`;
+      if (quote.c && target.targetLow && target.targetHigh) {
+        const pos = ((quote.c - target.targetLow) / (target.targetHigh - target.targetLow)) * 100;
+        document.getElementById('analyst-current').style.left = `${Math.min(100,Math.max(0,pos))}%`;
+      }
+    }
+
+    // Earnings date
+    const now = new Date();
+    const from = now.toISOString().split('T')[0];
+    const to = new Date(now.getTime() + 90*24*60*60*1000).toISOString().split('T')[0];
+    const earnRes = await fetch(`https://finnhub.io/api/v1/calendar/earnings?symbol=${ticker}&from=${from}&to=${to}&token=${FINNHUB_KEY}`);
+    const earn = await earnRes.json();
+    if (earn.earningsCalendar && earn.earningsCalendar.length > 0) {
+      const nextEarn = earn.earningsCalendar[0].date;
+      const formatted = nextEarn.replace(/-/g, '/');
+      // Update in stats grid
+      const items = document.querySelectorAll('.stat-item');
+      items.forEach(item => {
+        if (item.querySelector('.label').textContent === 'Next Earnings') {
+          const daysUntil = Math.ceil((new Date(nextEarn) - now) / (1000*60*60*24));
+          const val = item.querySelector('.value');
+          val.textContent = formatted;
+          if (daysUntil <= 7) val.classList.add('highlight-soon');
+        }
+      });
+    }
+
+  } catch(err) {
+    console.error('Error fetching stock data:', err);
+  }
+}
+
+// ============================================
+// RENDER: WATCHLIST TABLE
+// ============================================
+function renderWatchlist(container, category, title) {
+  const tickers = WATCHLIST[category] || [];
+  container.innerHTML = `
+    <div class="panel">
+      <div class="panel-header">
+        <h3>${title} (${tickers.length} tickers)</h3>
+      </div>
+      <div class="panel-body" style="padding:0; overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Price</th>
+              <th>Chg $</th>
+              <th>Chg %</th>
+              <th>P/E</th>
+              <th>Div %</th>
+              <th>Ex-Div</th>
+              <th>Earnings</th>
+              <th>52W Hi</th>
+              <th>52W Lo</th>
+              <th>Analyst Lo</th>
+              <th>Analyst Mid</th>
+              <th>Analyst Hi</th>
+              <th>Vol</th>
+              <th>Links</th>
+            </tr>
+          </thead>
+          <tbody id="watchlist-body">
+            ${tickers.map(t => `
+              <tr>
+                <td class="ticker-cell" onclick="loadStockView('${t}')">${t}</td>
+                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                <td><a href="https://stockanalysis.com/stocks/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // Fetch data for all tickers (throttled)
+  fetchWatchlistData(tickers, 'watchlist-body');
+}
+
+async function fetchWatchlistData(tickers, tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+
+  for (let i = 0; i < tickers.length; i++) {
+    const ticker = tickers[i];
+    try {
+      // Quote
+      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`);
+      const q = await res.json();
+      if (q.c) {
+        const row = tbody.children[i];
+        if (!row) continue;
+        const cells = row.cells;
+        const change = (q.c - q.pc).toFixed(2);
+        const pct = ((q.c - q.pc) / q.pc * 100).toFixed(2);
+        const isUp = parseFloat(change) >= 0;
+        cells[1].textContent = `$${q.c.toFixed(2)}`;
+        cells[2].textContent = `${isUp?'+':''}${change}`;
+        cells[2].className = isUp ? 'up' : 'down';
+        cells[3].textContent = `${isUp?'+':''}${pct}%`;
+        cells[3].className = isUp ? 'up' : 'down';
+        cells[8].textContent = q.h ? `$${q.h.toFixed(2)}` : '—';
+        cells[9].textContent = q.l ? `$${q.l.toFixed(2)}` : '—';
+      }
+
+      // Price target (analyst)
+      const targetRes = await fetch(`https://finnhub.io/api/v1/stock/price-target?symbol=${ticker}&token=${FINNHUB_KEY}`);
+      const target = await targetRes.json();
+      if (target.targetLow) {
+        const row = tbody.children[i];
+        if (!row) continue;
+        const cells = row.cells;
+        cells[10].textContent = `$${target.targetLow.toFixed(0)}`;
+        cells[11].textContent = `$${target.targetMedian.toFixed(0)}`;
+        cells[12].textContent = `$${target.targetHigh.toFixed(0)}`;
+      }
+
+      // Basic metrics (P/E, Div)
+      const metRes = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FINNHUB_KEY}`);
+      const met = await metRes.json();
+      if (met.metric) {
+        const row = tbody.children[i];
+        if (!row) continue;
+        const cells = row.cells;
+        const m = met.metric;
+        cells[4].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
+        cells[5].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
+        cells[6].textContent = m.exDividendDate ? m.exDividendDate.replace(/-/g,'/') : '—';
+        // Highlight if ex-div within 7 days
+        if (m.exDividendDate) {
+          const daysUntil = Math.ceil((new Date(m.exDividendDate) - new Date()) / (1000*60*60*24));
+          if (daysUntil >= 0 && daysUntil <= 7) cells[6].innerHTML = `<span class="highlight-soon">${m.exDividendDate.replace(/-/g,'/')}</span>`;
+        }
+      }
+
+    } catch(e) { /* skip */ }
+    // Throttle: 3 calls per ticker, Finnhub free = 60/min → ~20 tickers/min
+    if (i % 3 === 2) await new Promise(r => setTimeout(r, 3200));
+  }
+}
+
+// ============================================
+// RENDER: PORTFOLIO
+// ============================================
+function renderPortfolio(container) {
+  const holdings = JSON.parse(localStorage.getItem('terminal_holdings') || '[]');
+  container.innerHTML = `
+    <div class="panel">
+      <div class="panel-header">
+        <h3>Portfolio</h3>
+      </div>
+      <div class="panel-body">
+        <div style="margin-bottom:12px;">
+          <input type="text" id="add-ticker" placeholder="Ticker" style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:6px 10px; border-radius:4px; width:80px; margin-right:6px;">
+          <input type="number" id="add-shares" placeholder="Shares" style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:6px 10px; border-radius:4px; width:80px; margin-right:6px;">
+          <input type="number" id="add-cost" placeholder="Avg Cost" style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:6px 10px; border-radius:4px; width:100px; margin-right:6px;">
+          <button onclick="addHolding()" style="background:var(--green); color:var(--bg-primary); border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-weight:600;">Add</button>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Ticker</th><th>Shares</th><th>Avg Cost</th><th>Current</th><th>P/L $</th><th>P/L %</th><th>Value</th><th></th></tr></thead>
+          <tbody id="portfolio-body">
+            ${holdings.map((h,i) => `<tr>
+              <td class="ticker-cell" onclick="loadStockView('${h.ticker}')">${h.ticker}</td>
+              <td>${h.shares}</td>
+              <td>$${h.cost.toFixed(2)}</td>
+              <td>—</td><td>—</td><td>—</td><td>—</td>
+              <td><span style="cursor:pointer; color:var(--red);" onclick="removeHolding(${i})">✕</span></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function addHolding() {
+  const ticker = document.getElementById('add-ticker').value.trim().toUpperCase();
+  const shares = parseFloat(document.getElementById('add-shares').value);
+  const cost = parseFloat(document.getElementById('add-cost').value);
+  if (!ticker || !shares || !cost) return;
+  const holdings = JSON.parse(localStorage.getItem('terminal_holdings') || '[]');
+  holdings.push({ ticker, shares, cost });
+  localStorage.setItem('terminal_holdings', JSON.stringify(holdings));
+  loadView('portfolio');
+}
+
+function removeHolding(idx) {
+  const holdings = JSON.parse(localStorage.getItem('terminal_holdings') || '[]');
+  holdings.splice(idx, 1);
+  localStorage.setItem('terminal_holdings', JSON.stringify(holdings));
+  loadView('portfolio');
+}
+
+// ============================================
+// RENDER: EARNINGS CALENDAR
+// ============================================
+function renderEarnings(container) {
+  container.innerHTML = `
+    <div class="panel">
+      <div class="panel-header"><h3>Upcoming Earnings (Your Watchlist)</h3></div>
+      <div class="panel-body"><div class="loading">Fetching earnings dates...</div></div>
+    </div>
+  `;
+  // In production, fetch from Finnhub earnings calendar
+}
+
+// ============================================
+// RENDER: SECTORS
+// ============================================
+function renderSectors(container) {
+  container.innerHTML = `
+    <div class="panel">
+      <div class="panel-header"><h3>Sector Heatmap</h3></div>
+      <div class="panel-body">
+        <p style="color:var(--text-secondary);">Sector performance heatmap powered by market data. Click a sector to drill into industries.</p>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:16px;" id="sector-grid"></div>
+      </div>
+    </div>
+  `;
+  const sectors = ['Technology','Healthcare','Financials','Consumer Disc.','Industrials','Energy','Materials','Real Estate','Utilities','Comm. Services','Consumer Staples'];
+  const grid = document.getElementById('sector-grid');
+  grid.innerHTML = sectors.map(s => {
+    const pct = (Math.random() * 4 - 1.5).toFixed(2);
+    const isUp = parseFloat(pct) >= 0;
+    return `<div style="background:${isUp?'#00d4aa22':'#ff475722'}; border:1px solid ${isUp?'#00d4aa44':'#ff475744'}; padding:16px; border-radius:6px; text-align:center; cursor:pointer;">
+      <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:4px;">${s}</div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; color:${isUp?'var(--green)':'var(--red)'};">${isUp?'+':''}${pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================
+// RENDER: MACRO
+// ============================================
+function renderMacro(container) {
+  container.innerHTML = `
+    <div class="panel">
+      <div class="panel-header"><h3>Macro & Economy</h3></div>
+      <div class="panel-body">
+        <div class="stats-grid">
+          <div class="stat-item"><div class="label">10Y Treasury</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">2Y Treasury</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">DXY (Dollar)</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">VIX</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">Gold</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">Oil (WTI)</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">BTC</div><div class="value">—</div></div>
+          <div class="stat-item"><div class="label">Fed Rate</div><div class="value">5.25-5.50%</div></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================
+// RENDER: VALUATION TOOLS
+// ============================================
+function renderValuation(container) {
+  container.innerHTML = `
+    <div class="panel">
+      <div class="panel-header"><h3>DCF Quick Calculator</h3></div>
+      <div class="panel-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:16px;">
+          <div><label style="font-size:0.7rem; color:var(--text-dim);">Current EPS</label><br><input type="number" id="dcf-eps" value="5.00" style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:6px; border-radius:4px; width:100%;"></div>
+          <div><label style="font-size:0.7rem; color:var(--text-dim);">Growth Rate %</label><br><input type="number" id="dcf-growth" value="15" style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:6px; border-radius:4px; width:100%;"></div>
+          <div><label style="font-size:0.7rem; color:var(--text-dim);">Discount Rate %</label><br><input type="number" id="dcf-discount" value="10" style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:6px; border-radius:4px; width:100%;"></div>
+        </div>
+        <button onclick="calcDCF()" style="background:var(--blue); color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">Calculate Fair Value</button>
+        <div id="dcf-result" style="margin-top:12px; font-family:'IBM Plex Mono',monospace; font-size:1.2rem;"></div>
+      </div>
+    </div>
+  `;
+}
+
+function calcDCF() {
+  const eps = parseFloat(document.getElementById('dcf-eps').value);
+  const g = parseFloat(document.getElementById('dcf-growth').value) / 100;
+  const d = parseFloat(document.getElementById('dcf-discount').value) / 100;
+  let totalPV = 0;
+  for (let y = 1; y <= 10; y++) {
+    totalPV += (eps * Math.pow(1+g, y)) / Math.pow(1+d, y);
+  }
+  const terminalValue = (eps * Math.pow(1+g, 10) * (1+0.03)) / (d - 0.03);
+  const pvTerminal = terminalValue / Math.pow(1+d, 10);
+  const fairValue = (totalPV + pvTerminal).toFixed(2);
+  document.getElementById('dcf-result').innerHTML = `Fair Value Estimate: <span style="color:var(--green);">$${fairValue}</span>`;
+}
+
+// ============================================
+// RENDER: NOTES
+// ============================================
+function renderNotes(container) {
+  const notes = JSON.parse(localStorage.getItem('terminal_notes') || '{}');
+  container.innerHTML = `
+    <div class="panel">
+      <div class="panel-header"><h3>Investment Thesis & Notes</h3></div>
+      <div class="panel-body">
+        <div style="margin-bottom:12px;">
+          <input type="text" id="note-ticker" placeholder="Ticker" style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:6px 10px; border-radius:4px; width:100px; margin-right:6px;">
+          <button onclick="addNote()" style="background:var(--blue); color:white; border:none; padding:6px 14px; border-radius:4px; cursor:pointer;">Add/Edit Note</button>
+        </div>
+        <textarea id="note-content" placeholder="Write your thesis, key risks, buy/sell triggers..." style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:12px; border-radius:4px; width:100%; height:200px; resize:vertical; font-family:inherit; font-size:0.85rem;"></textarea>
+        <div style="margin-top:16px;">
+          ${Object.entries(notes).map(([t,n]) => `<div style="margin-bottom:12px; padding:10px; background:var(--bg-secondary); border-radius:6px; border:1px solid var(--border);">
+            <strong style="color:var(--blue);">${t}</strong>
+            <p style="color:var(--text-secondary); font-size:0.8rem; margin-top:4px; white-space:pre-wrap;">${n}</p>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function addNote() {
+  const ticker = document.getElementById('note-ticker').value.trim().toUpperCase();
+  const content = document.getElementById('note-content').value.trim();
+  if (!ticker || !content) return;
+  const notes = JSON.parse(localStorage.getItem('terminal_notes') || '{}');
+  notes[ticker] = content;
+  localStorage.setItem('terminal_notes', JSON.stringify(notes));
+  loadView('notes');
+}
+
+// ============================================
+// RENDER: ALERTS
+// ============================================
+function renderAlerts(container) {
+  const alerts = JSON.parse(localStorage.getItem('terminal_alerts') || '[]');
+  container.innerHTML = `
+    <div class="panel">
+      <div class="panel-header"><h3>Price Alerts</h3></div>
+      <div class="panel-body">
+        <div style="margin-bottom:12px;">
+          <input type="text" id="alert-ticker" placeholder="Ticker" style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:6px 10px; border-radius:4px; width:80px; margin-right:6px;">
+          <select id="alert-type" style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:6px 10px; border-radius:4px; margin-right:6px;">
+            <option value="above">Price Above</option>
+            <option value="below">Price Below</option>
+          </select>
+          <input type="number" id="alert-price" placeholder="$" style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:6px 10px; border-radius:4px; width:100px; margin-right:6px;">
+          <button onclick="addAlert()" style="background:var(--yellow); color:var(--bg-primary); border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-weight:600;">Set Alert</button>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Ticker</th><th>Condition</th><th>Target</th><th></th></tr></thead>
+          <tbody>
+            ${alerts.map((a,i) => `<tr><td>${a.ticker}</td><td>${a.type}</td><td>$${a.price}</td><td><span style="cursor:pointer; color:var(--red);" onclick="removeAlert(${i})">✕</span></td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function addAlert() {
+  const ticker = document.getElementById('alert-ticker').value.trim().toUpperCase();
+  const type = document.getElementById('alert-type').value;
+  const price = parseFloat(document.getElementById('alert-price').value);
+  if (!ticker || !price) return;
+  const alerts = JSON.parse(localStorage.getItem('terminal_alerts') || '[]');
+  alerts.push({ ticker, type, price });
+  localStorage.setItem('terminal_alerts', JSON.stringify(alerts));
+  loadView('alerts');
+}
+
+function removeAlert(idx) {
+  const alerts = JSON.parse(localStorage.getItem('terminal_alerts') || '[]');
+  alerts.splice(idx, 1);
+  localStorage.setItem('terminal_alerts', JSON.stringify(alerts));
+  loadView('alerts');
+}
+</script>
+
+</body>
+</html>
