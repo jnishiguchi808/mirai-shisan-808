@@ -175,6 +175,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="logistics" style="padding-left:28px;">Logistics</a>
     <a href="#" data-view="etfs" style="padding-left:28px;">ETFs &amp; Funds</a>
     <a href="#" data-view="vanguard" style="padding-left:28px;">Vanguard</a>
+    <a href="#" data-view="fidelity" style="padding-left:28px;">Fidelity</a>
     <div class="section-label">Research</div>
     <a href="#" data-view="news">News &amp; Analysts</a>
     <a href="#" data-view="sectors">Sector Heatmap</a>
@@ -218,6 +219,7 @@ const WATCHLIST = {
   staples: ['PG','CPB','CLX'],
   travel: ['MAR','DAL','H','AAL','CCL','UAL','ALK','BA','ABNB'],
   logistics: ['MATX','RXO','CHRW','SBLK','DHLGY','FDX','XPO','GSL','DAC','AMKBY','GNK','UNP','UPS','ZIM'],
+  fidelity: ['FTEC','FCLD','FDTX','FBCG','FDIG','FDRV','FFLG','FMET','FBOT','ONEQ','FEMR','FDIF','FDMO','FESM','FFEM','FDCF','FELG','FDEM','FELC','FFLC','FFSM','FMAG','FVAL','FELV','FFGX','FSMD','FDRR','FIDU','FQAL','FCPI','FLRG','FMDE','FRNW','FBCV','FFDI','FDVV','FENI','FIVA','FDBC','FDLO','FCOM','FPRO','FDIS','FEAC','FFLV','FHLC','FNCL','FSEV','FBUF','FIDI'],
   vanguard: ['VGT','VOOG','VTWG','MGK','VUG','VBK','VFMO','VONG','VOT','VPL','VTWO','MGC','VEXC','VOO','VTHR','VTI','VV','VXF','IVOG','VIOG','VONE','VSGX','VB','VIOO','VT','VTWV','IVOO','VFMF','VIOV','VIS','VONV','VEA','VEU','VXUS','VO','MGV','VBR','VIG','VTV','VWO','IVOV','VGK','VOOV','VSS','VFQY','VOE','VYM','VNQ','VOX','VCR']
 };
 
@@ -359,6 +361,7 @@ function loadView(view) {
     case 'travel': renderWatchlist(main, 'travel', 'Travel Watchlist'); break;
     case 'logistics': renderWatchlist(main, 'logistics', 'Logistics Watchlist'); break;
     case 'vanguard': renderWatchlist(main, 'vanguard', 'Vanguard Watchlist'); break;
+    case 'fidelity': renderWatchlist(main, 'fidelity', 'Fidelity Watchlist'); break;
     case 'portfolio': renderPortfolio(main); break;
     case 'earnings': renderEarnings(main); break;
     case 'sectors': renderSectors(main); break;
