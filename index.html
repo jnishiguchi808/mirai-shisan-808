@@ -26,7 +26,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
 /* PASSWORD GATE */
 #password-gate { position:fixed; inset:0; background:var(--bg-primary); z-index:9999; display:flex; align-items:center; justify-content:center; flex-direction:column; }
 #password-gate.hidden { display:none; }
-#password-gate h1 { font-family:'IBM Plex Mono',monospace; font-size:2rem; color:var(--green); margin-bottom:24px; }
+#password-gate h1 { font-family:'IBM Plex Mono',monospace; font-size:2rem; color:var(--green); margin-bottom:4px; }
 #password-gate input { background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); padding:12px 20px; font-size:1rem; border-radius:6px; width:280px; text-align:center; }
 #password-gate input:focus { outline:none; border-color:var(--green); }
 #password-gate .error { color:var(--red); margin-top:10px; font-size:0.8rem; }
@@ -141,7 +141,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
 <!-- PASSWORD GATE -->
 <div id="password-gate">
   <h1>未来資産 808</h1>
-  <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:20px;">Future Wealth &amp; Assets</p>
+  <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:16px;">Future Wealth &amp; Assets</p>
   <input type="password" id="pw-input" placeholder="Enter password" autofocus>
   <div class="error" id="pw-error"></div>
 </div>
