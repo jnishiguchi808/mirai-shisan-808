@@ -166,13 +166,15 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
   <div class="sidebar">
     <a href="#" class="active" data-view="overview">Overview</a>
     <a href="#" data-view="portfolio">Portfolio</a>
-    <a href="#" data-view="watchlist">Watchlist</a>
-    <a href="#" data-view="semiconductors">Semiconductors</a>
-    <a href="#" data-view="retail">Retail</a>
-    <a href="#" data-view="staples">Staples</a>
-    <a href="#" data-view="travel">Travel</a>
-    <a href="#" data-view="logistics">Logistics</a>
-    <a href="#" data-view="etfs">ETFs &amp; Funds</a>
+    <div class="section-label">Watchlists</div>
+    <a href="#" data-view="watchlist" style="padding-left:28px;">Stocks</a>
+    <a href="#" data-view="semiconductors" style="padding-left:28px;">Semiconductors</a>
+    <a href="#" data-view="retail" style="padding-left:28px;">Retail</a>
+    <a href="#" data-view="staples" style="padding-left:28px;">Staples</a>
+    <a href="#" data-view="travel" style="padding-left:28px;">Travel</a>
+    <a href="#" data-view="logistics" style="padding-left:28px;">Logistics</a>
+    <a href="#" data-view="etfs" style="padding-left:28px;">ETFs &amp; Funds</a>
+    <a href="#" data-view="vanguard" style="padding-left:28px;">Vanguard</a>
     <div class="section-label">Research</div>
     <a href="#" data-view="news">News &amp; Analysts</a>
     <a href="#" data-view="sectors">Sector Heatmap</a>
@@ -215,7 +217,8 @@ const WATCHLIST = {
   retail: ['CROX','AMZN','DDS','EBAY','KSS','WMT','MELI','COST','DIS','SPG','SKT','KIM','O','HAS','TGT','LULU','NKE','JMIA','CPNG'],
   staples: ['PG','CPB','CLX'],
   travel: ['MAR','DAL','H','AAL','CCL','UAL','ALK','BA','ABNB'],
-  logistics: ['MATX','RXO','CHRW','SBLK','DHLGY','FDX','XPO','GSL','DAC','AMKBY','GNK','UNP','UPS','ZIM']
+  logistics: ['MATX','RXO','CHRW','SBLK','DHLGY','FDX','XPO','GSL','DAC','AMKBY','GNK','UNP','UPS','ZIM'],
+  vanguard: ['VGT','VOOG','VTWG','MGK','VUG','VBK','VFMO','VONG','VOT','VPL','VTWO','MGC','VEXC','VOO','VTHR','VTI','VV','VXF','IVOG','VIOG','VONE','VSGX','VB','VIOO','VT','VTWV','IVOO','VFMF','VIOV','VIS','VONV','VEA','VEU','VXUS','VO','MGV','VBR','VIG','VTV','VWO','IVOV','VGK','VOOV','VSS','VFQY','VOE','VYM','VNQ','VOX','VCR']
 };
 
 const QUICK_TICKERS = ['NVDA','MSFT','META','GOOGL','AMD','TSM','AAPL','AMZN'];
@@ -348,13 +351,14 @@ function loadView(view) {
   const main = document.getElementById('main-content');
   switch(view) {
     case 'overview': renderOverview(main); break;
-    case 'watchlist': renderWatchlist(main, 'equities', 'Equities Watchlist'); break;
+    case 'watchlist': renderWatchlist(main, 'equities', 'Stocks Watchlist'); break;
     case 'etfs': renderWatchlist(main, 'etfs', 'ETFs & Closed End Funds'); break;
     case 'semiconductors': renderWatchlist(main, 'semiconductors', 'Semiconductor Watchlist'); break;
     case 'retail': renderWatchlist(main, 'retail', 'Retail Watchlist'); break;
     case 'staples': renderWatchlist(main, 'staples', 'Staples Watchlist'); break;
     case 'travel': renderWatchlist(main, 'travel', 'Travel Watchlist'); break;
     case 'logistics': renderWatchlist(main, 'logistics', 'Logistics Watchlist'); break;
+    case 'vanguard': renderWatchlist(main, 'vanguard', 'Vanguard Watchlist'); break;
     case 'portfolio': renderPortfolio(main); break;
     case 'earnings': renderEarnings(main); break;
     case 'sectors': renderSectors(main); break;
