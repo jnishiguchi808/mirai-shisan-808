@@ -636,8 +636,11 @@ async function fetchWatchlistData(tickers, tbodyId) {
         cells[2].className = isUp ? 'up' : 'down';
         cells[3].textContent = `${isUp?'+':''}${pct}%`;
         cells[3].className = isUp ? 'up' : 'down';
-        cells[8].textContent = q.h ? `$${q.h.toFixed(2)}` : '—';
-        cells[9].textContent = q.l ? `$${q.l.toFixed(2)}` : '—';
+        // Volume from quote
+        if (q.v) {
+          const vol = q.v >= 1e6 ? `${(q.v/1e6).toFixed(1)}M` : q.v >= 1e3 ? `${(q.v/1e3).toFixed(0)}K` : `${q.v}`;
+          cells[13].textContent = vol;
+        }
       }
 
       // Price target (analyst)
@@ -652,7 +655,7 @@ async function fetchWatchlistData(tickers, tbodyId) {
         cells[12].textContent = `$${target.targetHigh.toFixed(0)}`;
       }
 
-      // Basic metrics (P/E, Div)
+      // Basic metrics (P/E, Div, 52W, Ex-Div)
       const metRes = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FINNHUB_KEY}`);
       const met = await metRes.json();
       if (met.metric) {
@@ -663,6 +666,8 @@ async function fetchWatchlistData(tickers, tbodyId) {
         cells[4].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
         cells[5].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
         cells[6].textContent = m.exDividendDate ? m.exDividendDate.replace(/-/g,'/') : '—';
+        cells[8].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
+        cells[9].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
         // Highlight if ex-div within 7 days
         if (m.exDividendDate) {
           const daysUntil = Math.ceil((new Date(m.exDividendDate) - new Date()) / (1000*60*60*24));
@@ -671,8 +676,8 @@ async function fetchWatchlistData(tickers, tbodyId) {
       }
 
     } catch(e) { /* skip */ }
-    // Throttle: 3 calls per ticker, Finnhub free = 60/min → ~20 tickers/min
-    if (i % 3 === 2) await new Promise(r => setTimeout(r, 3200));
+    // Throttle: 3 calls per ticker, Finnhub free = 60/min → pause every ticker
+    await new Promise(r => setTimeout(r, 3100));
   }
 }
 
