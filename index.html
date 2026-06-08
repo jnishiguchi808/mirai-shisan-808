@@ -170,6 +170,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="semiconductors">Semiconductors</a>
     <a href="#" data-view="retail">Retail</a>
     <a href="#" data-view="staples">Staples</a>
+    <a href="#" data-view="travel">Travel</a>
     <a href="#" data-view="etfs">ETFs &amp; Funds</a>
     <div class="section-label">Research</div>
     <a href="#" data-view="news">News &amp; Analysts</a>
@@ -211,7 +212,8 @@ const WATCHLIST = {
   etfs: ['BUG','CGDV','COPX','DGRO','GDXY','GPIQ','IBIT','IDVO','ISPY','JEPQ','JPIE','KRE','MLPA','NVDY','SCHD','SOXQ','SPMO','SPYI','SPYM','TSLY','TSMY','VIG','VNQI','VWO','XLF','XLG'],
   semiconductors: ['MU','AMD','COHR','MRVL','TSM','LRCX','AMAT','NVDA','ASML','CRUS','KLIC','LSCC','UMC','AMKR','TXN','GFS','INTC','WOLF','SWKS','SLAB'],
   retail: ['CROX','AMZN','DDS','EBAY','KSS','WMT','MELI','COST','DIS','SPG','SKT','KIM','O','HAS','TGT','LULU','NKE','JMIA','CPNG'],
-  staples: ['PG','CPB','CLX']
+  staples: ['PG','CPB','CLX'],
+  travel: ['MAR','DAL','H','AAL','CCL','UAL','ALK','BA','ABNB']
 };
 
 const QUICK_TICKERS = ['NVDA','MSFT','META','GOOGL','AMD','TSM','AAPL','AMZN'];
@@ -349,6 +351,7 @@ function loadView(view) {
     case 'semiconductors': renderWatchlist(main, 'semiconductors', 'Semiconductor Watchlist'); break;
     case 'retail': renderWatchlist(main, 'retail', 'Retail Watchlist'); break;
     case 'staples': renderWatchlist(main, 'staples', 'Staples Watchlist'); break;
+    case 'travel': renderWatchlist(main, 'travel', 'Travel Watchlist'); break;
     case 'portfolio': renderPortfolio(main); break;
     case 'earnings': renderEarnings(main); break;
     case 'sectors': renderSectors(main); break;
