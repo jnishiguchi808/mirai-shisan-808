@@ -584,6 +584,7 @@ function renderWatchlist(container, category, title) {
               <th>Chg $</th>
               <th>Chg %</th>
               <th>P/E</th>
+              <th>P/B</th>
               <th>Div %</th>
               <th>Ex-Div</th>
               <th>Earnings</th>
@@ -600,7 +601,7 @@ function renderWatchlist(container, category, title) {
             ${tickers.map(t => `
               <tr>
                 <td class="ticker-cell" onclick="loadStockView('${t}')">${t}</td>
-                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
                 <td><a href="https://stockanalysis.com/stocks/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
               </tr>
             `).join('')}
@@ -639,7 +640,7 @@ async function fetchWatchlistData(tickers, tbodyId) {
         // Volume from quote
         if (q.v) {
           const vol = q.v >= 1e6 ? `${(q.v/1e6).toFixed(1)}M` : q.v >= 1e3 ? `${(q.v/1e3).toFixed(0)}K` : `${q.v}`;
-          cells[13].textContent = vol;
+          cells[14].textContent = vol;
         }
       }
 
@@ -650,12 +651,12 @@ async function fetchWatchlistData(tickers, tbodyId) {
         const row = tbody.children[i];
         if (!row) continue;
         const cells = row.cells;
-        cells[10].textContent = `$${target.targetLow.toFixed(0)}`;
-        cells[11].textContent = `$${target.targetMedian.toFixed(0)}`;
-        cells[12].textContent = `$${target.targetHigh.toFixed(0)}`;
+        cells[11].textContent = `$${target.targetLow.toFixed(0)}`;
+        cells[12].textContent = `$${target.targetMedian.toFixed(0)}`;
+        cells[13].textContent = `$${target.targetHigh.toFixed(0)}`;
       }
 
-      // Basic metrics (P/E, Div, 52W, Ex-Div)
+      // Basic metrics (P/E, P/B, Div, 52W, Ex-Div)
       const metRes = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FINNHUB_KEY}`);
       const met = await metRes.json();
       if (met.metric) {
@@ -664,14 +665,15 @@ async function fetchWatchlistData(tickers, tbodyId) {
         const cells = row.cells;
         const m = met.metric;
         cells[4].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
-        cells[5].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
-        cells[6].textContent = m.exDividendDate ? m.exDividendDate.replace(/-/g,'/') : '—';
-        cells[8].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
-        cells[9].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
+        cells[5].textContent = m.pbAnnual?.toFixed(2) || '—';
+        cells[6].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
+        cells[7].textContent = m.exDividendDate ? m.exDividendDate.replace(/-/g,'/') : '—';
+        cells[9].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
+        cells[10].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
         // Highlight if ex-div within 7 days
         if (m.exDividendDate) {
           const daysUntil = Math.ceil((new Date(m.exDividendDate) - new Date()) / (1000*60*60*24));
-          if (daysUntil >= 0 && daysUntil <= 7) cells[6].innerHTML = `<span class="highlight-soon">${m.exDividendDate.replace(/-/g,'/')}</span>`;
+          if (daysUntil >= 0 && daysUntil <= 7) cells[7].innerHTML = `<span class="highlight-soon">${m.exDividendDate.replace(/-/g,'/')}</span>`;
         }
       }
 
