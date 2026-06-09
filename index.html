@@ -679,18 +679,20 @@ async function fetchWatchlistData(tickers, tbodyId) {
               // Ex-dividend date
               const exDivIdx = d[0].exDividendDate;
               if (exDivIdx !== undefined && d[exDivIdx]) {
-                cells[10].textContent = d[exDivIdx];
-                // Highlight if ex-div within 7 days
                 const exDate = new Date(d[exDivIdx]);
+                const exFmt = !isNaN(exDate) ? `${(exDate.getMonth()+1).toString().padStart(2,'0')}/${exDate.getDate().toString().padStart(2,'0')}/${exDate.getFullYear().toString().slice(-2)}` : d[exDivIdx];
+                cells[10].textContent = exFmt;
+                // Highlight if ex-div within 7 days
                 if (!isNaN(exDate)) {
                   const daysUntil = Math.ceil((exDate - new Date()) / (1000*60*60*24));
-                  if (daysUntil >= 0 && daysUntil <= 7) cells[10].innerHTML = `<span class="highlight-soon">${d[exDivIdx]}</span>`;
+                  if (daysUntil >= 0 && daysUntil <= 7) cells[10].innerHTML = `<span class="highlight-soon">${exFmt}</span>`;
                 }
               }
               // Earnings date
               const edIdx = d[0].earningsDate;
               if (edIdx !== undefined && d[edIdx]) {
-                cells[11].textContent = d[edIdx];
+                const edDate = new Date(d[edIdx]);
+                cells[11].textContent = !isNaN(edDate) ? `${(edDate.getMonth()+1).toString().padStart(2,'0')}/${edDate.getDate().toString().padStart(2,'0')}/${edDate.getFullYear().toString().slice(-2)}` : d[edIdx];
               }
             }
           }
