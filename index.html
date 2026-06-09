@@ -594,6 +594,7 @@ function renderWatchlist(container, category, title) {
           <thead>
             <tr>
               <th>Ticker</th>
+              <th>Sig</th>
               <th>Price</th>
               <th>Chg $</th>
               <th>Chg %</th>
@@ -618,7 +619,7 @@ function renderWatchlist(container, category, title) {
             ${tickers.map(t => `
               <tr>
                 <td class="ticker-cell" onclick="loadStockView('${t}')">${t}</td>
-                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
                 <td><a href="https://stockanalysis.com/stocks/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://www.macrotrends.net/stocks/charts/${t}/x/stock-price-history" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">MT</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
               </tr>
             `).join('')}
@@ -649,15 +650,15 @@ async function fetchWatchlistData(tickers, tbodyId) {
         const change = (q.c - q.pc).toFixed(2);
         const pct = ((q.c - q.pc) / q.pc * 100).toFixed(2);
         const isUp = parseFloat(change) >= 0;
-        cells[1].textContent = `$${q.c.toFixed(2)}`;
-        cells[2].textContent = `${isUp?'+':''}${change}`;
-        cells[2].className = isUp ? 'up' : 'down';
-        cells[3].textContent = `${isUp?'+':''}${pct}%`;
+        cells[2].textContent = `$${q.c.toFixed(2)}`;
+        cells[3].textContent = `${isUp?'+':''}${change}`;
         cells[3].className = isUp ? 'up' : 'down';
+        cells[4].textContent = `${isUp?'+':''}${pct}%`;
+        cells[4].className = isUp ? 'up' : 'down';
         // Volume from quote
         if (q.v) {
           const vol = q.v >= 1e6 ? `${(q.v/1e6).toFixed(1)}M` : q.v >= 1e3 ? `${(q.v/1e3).toFixed(0)}K` : `${q.v}`;
-          cells[17].textContent = vol;
+          cells[18].textContent = vol;
         }
       }
 
@@ -681,18 +682,18 @@ async function fetchWatchlistData(tickers, tbodyId) {
               if (exDivIdx !== undefined && d[exDivIdx]) {
                 const exDate = new Date(d[exDivIdx]);
                 const exFmt = !isNaN(exDate) ? `${(exDate.getMonth()+1).toString().padStart(2,'0')}/${exDate.getDate().toString().padStart(2,'0')}/${exDate.getFullYear().toString().slice(-2)}` : d[exDivIdx];
-                cells[10].textContent = exFmt;
+                cells[11].textContent = exFmt;
                 // Highlight if ex-div within 7 days
                 if (!isNaN(exDate)) {
                   const daysUntil = Math.ceil((exDate - new Date()) / (1000*60*60*24));
-                  if (daysUntil >= 0 && daysUntil <= 7) cells[10].innerHTML = `<span class="highlight-soon">${exFmt}</span>`;
+                  if (daysUntil >= 0 && daysUntil <= 7) cells[11].innerHTML = `<span class="highlight-soon">${exFmt}</span>`;
                 }
               }
               // Earnings date
               const edIdx = d[0].earningsDate;
               if (edIdx !== undefined && d[edIdx]) {
                 const edDate = new Date(d[edIdx]);
-                cells[11].textContent = !isNaN(edDate) ? `${(edDate.getMonth()+1).toString().padStart(2,'0')}/${edDate.getDate().toString().padStart(2,'0')}/${edDate.getFullYear().toString().slice(-2)}` : d[edIdx];
+                cells[12].textContent = !isNaN(edDate) ? `${(edDate.getMonth()+1).toString().padStart(2,'0')}/${edDate.getDate().toString().padStart(2,'0')}/${edDate.getFullYear().toString().slice(-2)}` : d[edIdx];
               }
             }
           }
@@ -716,9 +717,9 @@ async function fetchWatchlistData(tickers, tbodyId) {
                 const row = tbody.children[i];
                 if (row) {
                   const cells = row.cells;
-                  cells[14].textContent = `$${Math.round(low)}`;
-                  cells[15].textContent = `$${Math.round(median)}`;
-                  cells[16].textContent = `$${Math.round(high)}`;
+                  cells[15].textContent = `$${Math.round(low)}`;
+                  cells[16].textContent = `$${Math.round(median)}`;
+                  cells[17].textContent = `$${Math.round(high)}`;
                 }
               }
             }
@@ -734,9 +735,9 @@ async function fetchWatchlistData(tickers, tbodyId) {
         if (!row) continue;
         const cells = row.cells;
         const m = met.metric;
-        cells[4].textContent = m.beta?.toFixed(2) || '—';
-        cells[5].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
-        cells[7].textContent = m.pbAnnual?.toFixed(2) || '—';
+        cells[5].textContent = m.beta?.toFixed(2) || '—';
+        cells[6].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
+        cells[8].textContent = m.pbAnnual?.toFixed(2) || '—';
         // PEG with color-coding and growth tooltip
         const peg = m.forwardPEG || m.pegTTM;
         const growth = m.epsGrowthTTMYoy;
@@ -753,13 +754,13 @@ async function fetchWatchlistData(tickers, tbodyId) {
           }
           const growthStr = growth ? `${growth > 0 ? '+' : ''}${growth.toFixed(0)}% EPS growth YoY` : 'Growth data unavailable';
           const tipText = peg < 0.5 && growth > 100 ? `${pegWarning}${growthStr} (cyclical?)` : growthStr;
-          cells[8].innerHTML = `<span style="color:${pegColor}" title="${tipText}">${peg.toFixed(2)}</span>`;
+          cells[9].innerHTML = `<span style="color:${pegColor}" title="${tipText}">${peg.toFixed(2)}</span>`;
         } else {
-          cells[8].textContent = '—';
+          cells[9].textContent = '—';
         }
-        cells[9].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
-        cells[12].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
-        cells[13].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
+        cells[10].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
+        cells[13].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
+        cells[14].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
       }
 
       // Historical P/E (5Y median from Macrotrends)
@@ -785,21 +786,67 @@ async function fetchWatchlistData(tickers, tbodyId) {
               const row = tbody.children[i];
               if (row) {
                 const cells = row.cells;
-                const currentPE = parseFloat(cells[5].textContent);
+                const currentPE = parseFloat(cells[6].textContent);
                 const mtLink = `https://www.macrotrends.net/stocks/charts/${ticker}/x/pe-ratio`;
                 if (currentPE && currentPE > 0) {
                   const dev = ((currentPE - median5Y) / median5Y * 100).toFixed(0);
                   const color = dev > 0 ? 'var(--red)' : 'var(--green)';
                   const sign = dev > 0 ? '+' : '';
-                  cells[6].innerHTML = `<a href="${mtLink}" target="_blank" style="color:${color}; text-decoration:none;">${median5Y.toFixed(1)} (${sign}${dev}%)</a>`;
+                  cells[7].innerHTML = `<a href="${mtLink}" target="_blank" style="color:${color}; text-decoration:none;">${median5Y.toFixed(1)} (${sign}${dev}%)</a>`;
                 } else {
-                  cells[6].innerHTML = `<a href="${mtLink}" target="_blank" style="color:var(--text-secondary); text-decoration:none;">${median5Y.toFixed(1)}</a>`;
+                  cells[7].innerHTML = `<a href="${mtLink}" target="_blank" style="color:var(--text-secondary); text-decoration:none;">${median5Y.toFixed(1)}</a>`;
                 }
               }
             }
           }
         }
       } catch(e) { /* Macrotrends fetch failed, skip */ }
+
+      // Technical Signal (50MA, 200MA, RSI from Yahoo Finance chart data)
+      try {
+        const yfUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`)}`;
+        const yfRes = await fetch(yfUrl);
+        if (yfRes.ok) {
+          const yfData = await yfRes.json();
+          const closes = yfData.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v => v != null);
+          if (closes && closes.length >= 200) {
+            // Calculate 50-day and 200-day MAs
+            const ma50 = closes.slice(-50).reduce((a, b) => a + b, 0) / 50;
+            const ma200 = closes.slice(-200).reduce((a, b) => a + b, 0) / 200;
+            const price = closes[closes.length - 1];
+
+            // Calculate RSI (14-day)
+            const period = 14;
+            const recent = closes.slice(-(period + 1));
+            let gains = 0, losses = 0;
+            for (let j = 1; j < recent.length; j++) {
+              const diff = recent[j] - recent[j - 1];
+              if (diff > 0) gains += diff; else losses -= diff;
+            }
+            const avgGain = gains / period;
+            const avgLoss = losses / period;
+            const rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+
+            // Determine signal
+            let signal = 'H', sigColor = 'var(--yellow)', sigTip = '';
+            if (price > ma50 && ma50 > ma200 && rsi < 70) {
+              signal = 'B'; sigColor = 'var(--green)';
+            } else if (price > ma200 && price <= ma50 * 1.02 && rsi < 40) {
+              signal = 'D'; sigColor = 'var(--blue)';
+            } else if (price < ma50 && ma50 < ma200) {
+              signal = 'S'; sigColor = 'var(--red)';
+            } else if (rsi > 80) {
+              signal = 'S'; sigColor = 'var(--red)';
+            }
+            sigTip = `Price: $${price.toFixed(0)} | 50MA: $${ma50.toFixed(0)} | 200MA: $${ma200.toFixed(0)} | RSI: ${rsi.toFixed(0)}`;
+
+            const row = tbody.children[i];
+            if (row) {
+              row.cells[1].innerHTML = `<span style="color:${sigColor}; font-weight:700;" title="${sigTip}">${signal}</span>`;
+            }
+          }
+        }
+      } catch(e) { /* Yahoo chart fetch failed, skip */ }
 
     } catch(e) { /* skip */ }
     // Throttle: 2 Finnhub + 1 StockAnalysis + 1 Macrotrends per ticker
