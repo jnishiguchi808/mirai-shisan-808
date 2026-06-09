@@ -168,14 +168,15 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="portfolio">Portfolio</a>
     <div class="section-label">Watchlists</div>
     <a href="#" data-view="etfs" style="padding-left:28px;">ETFs &amp; Funds</a>
-    <a href="#" data-view="etf-yieldmax" style="padding-left:28px;">ETF (Yieldmax)</a>
-    <a href="#" data-view="etf-sp500" style="padding-left:28px;">ETF (S&amp;P500)</a>
+    <a href="#" data-view="fidelity" style="padding-left:28px;">ETF (Fidelity)</a>
     <a href="#" data-view="etf-russell" style="padding-left:28px;">ETF (Russell)</a>
+    <a href="#" data-view="etf-sp500" style="padding-left:28px;">ETF (S&amp;P)</a>
+    <a href="#" data-view="vanguard" style="padding-left:28px;">ETF (Vanguard)</a>
+    <a href="#" data-view="etf-yieldmax" style="padding-left:28px;">ETF (Yieldmax)</a>
     <a href="#" data-view="ev" style="padding-left:28px;">EV</a>
     <a href="#" data-view="defense" style="padding-left:28px;">Defense</a>
     <a href="#" data-view="energy-old" style="padding-left:28px;">Energy (Old)</a>
     <a href="#" data-view="energy-new" style="padding-left:28px;">Energy (New)</a>
-    <a href="#" data-view="fidelity" style="padding-left:28px;">ETF (Fidelity)</a>
     <a href="#" data-view="fintech" style="padding-left:28px;">Fintech</a>
     <a href="#" data-view="gambling" style="padding-left:28px;">Gambling</a>
     <a href="#" data-view="insurance" style="padding-left:28px;">Insurance</a>
@@ -185,7 +186,6 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="staples" style="padding-left:28px;">Staples</a>
     <a href="#" data-view="watchlist" style="padding-left:28px;">Stocks</a>
     <a href="#" data-view="travel" style="padding-left:28px;">Travel</a>
-    <a href="#" data-view="vanguard" style="padding-left:28px;">ETF (Vanguard)</a>
     <div class="section-label">Research</div>
     <a href="#" data-view="tech-analysis">Technical Analysis</a>
     <a href="#" data-view="fair-value">Fair Value Calculation</a>
@@ -234,7 +234,7 @@ const WATCHLIST = {
   fintech: ['APPS','CBOE','PAYC','AXP','V','INTU','MA','SNOW','UPST','SE','XYZ','AFRM','SHOP','NU','TIGR','ARKF','PYPL','PAGS','STNE','MQ','PSFE','COIN'],
   ev: ['F','GM','TSLA','TM','XPEV','NIO','VFS','LCID'],
   defense: ['GD','AXON','TDG','LMT','RTX','NOC','LHX','HII','BA','KTOS','PLTR','ITA','PPA'],
-  etf_sp500: ['SPY','VOO','SPYI','SPYM','ISPY','SPMO','XLG','GPIQ','CGDV'],
+  etf_sp500: ['SPY','VOO','BALI','SPYI','SPYM','ISPY','SPMO','XLG','GPIQ','CGDV'],
   etf_russell: ['VONE','VONG','VONV','VTWO'],
   energy_old: ['PSX','GNRC','TTE','ECO','OKE','SLB','COP','HAL','FANG','HE','EPD','XOM','CVX','MLPA','VNOM','MLPI','PBA','DUK','ET','KMI','DVN','LNG','URA','URNM','PR','LB','AQN','OXY','SMR'],
   energy_new: ['FSLR','BWA','BLDP','NEE','HYLN','ENPH','GM','ICLN','AMT','LIT','VST','XIFR','BEP','FCEL','HMC','PLUG','NIU','CHPT','MVST','QS','BEPC','BLNK','NRDE','SPRU','EVGO','LCID'],
@@ -378,7 +378,7 @@ function loadView(view) {
     case 'watchlist': renderWatchlist(main, 'equities', 'Stocks Watchlist'); break;
     case 'etfs': renderWatchlist(main, 'etfs', 'ETFs & Closed End Funds'); break;
     case 'etf-yieldmax': renderWatchlist(main, 'etf_yieldmax', 'ETF (Yieldmax) Watchlist'); break;
-    case 'etf-sp500': renderWatchlist(main, 'etf_sp500', 'ETF (S&P500) Watchlist'); break;
+    case 'etf-sp500': renderWatchlist(main, 'etf_sp500', 'ETF (S&P) Watchlist'); break;
     case 'etf-russell': renderWatchlist(main, 'etf_russell', 'ETF (Russell) Watchlist'); break;
     case 'semiconductors': renderWatchlist(main, 'semiconductors', 'Semiconductor Watchlist'); break;
     case 'retail': renderWatchlist(main, 'retail', 'Retail Watchlist'); break;
