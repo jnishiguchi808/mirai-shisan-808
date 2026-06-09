@@ -735,7 +735,7 @@ async function fetchWatchlistData(tickers, tbodyId) {
         cells[4].textContent = m.beta?.toFixed(2) || '—';
         cells[5].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
         cells[7].textContent = m.pbAnnual?.toFixed(2) || '—';
-        cells[8].textContent = m.forwardPEG?.toFixed(2) || '—';
+        cells[8].textContent = m.forwardPEG?.toFixed(2) || m.pegTTM?.toFixed(2) || '—';
         cells[9].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
         cells[12].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
         cells[13].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
