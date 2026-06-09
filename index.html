@@ -735,7 +735,26 @@ async function fetchWatchlistData(tickers, tbodyId) {
         cells[4].textContent = m.beta?.toFixed(2) || '—';
         cells[5].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
         cells[7].textContent = m.pbAnnual?.toFixed(2) || '—';
-        cells[8].textContent = m.forwardPEG?.toFixed(2) || m.pegTTM?.toFixed(2) || '—';
+        // PEG with color-coding and growth tooltip
+        const peg = m.forwardPEG || m.pegTTM;
+        const growth = m.epsGrowthTTMYoy;
+        if (peg && peg > 0) {
+          let pegColor = 'var(--text-primary)';
+          let pegWarning = '';
+          if (peg < 0.5 && growth && Math.abs(growth) > 100) {
+            pegColor = 'var(--yellow)';
+            pegWarning = '⚠️ ';
+          } else if (peg < 1.0) {
+            pegColor = 'var(--green)';
+          } else if (peg > 2.0) {
+            pegColor = 'var(--red)';
+          }
+          const growthStr = growth ? `${growth > 0 ? '+' : ''}${growth.toFixed(0)}% EPS growth YoY` : 'Growth data unavailable';
+          const tipText = peg < 0.5 && growth > 100 ? `${pegWarning}${growthStr} (cyclical?)` : growthStr;
+          cells[8].innerHTML = `<span style="color:${pegColor}" title="${tipText}">${peg.toFixed(2)}</span>`;
+        } else {
+          cells[8].textContent = '—';
+        }
         cells[9].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
         cells[12].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
         cells[13].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
