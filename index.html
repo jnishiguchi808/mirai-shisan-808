@@ -177,6 +177,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="vanguard" style="padding-left:28px;">Vanguard</a>
     <a href="#" data-view="fidelity" style="padding-left:28px;">Fidelity</a>
     <div class="section-label">Research</div>
+    <a href="#" data-view="tech-analysis">Technical Analysis</a>
     <a href="#" data-view="news">News &amp; Analysts</a>
     <a href="#" data-view="sectors">Sector Heatmap</a>
     <a href="#" data-view="macro">Macro &amp; Economy</a>
@@ -365,6 +366,7 @@ function loadView(view) {
     case 'portfolio': renderPortfolio(main); break;
     case 'earnings': renderEarnings(main); break;
     case 'sectors': renderSectors(main); break;
+    case 'tech-analysis': renderTechAnalysis(main); break;
     case 'macro': renderMacro(main); break;
     case 'valuation': renderValuation(main); break;
     case 'notes': renderNotes(main); break;
@@ -922,6 +924,241 @@ function renderEarnings(container) {
 // ============================================
 // RENDER: SECTORS
 // ============================================
+// ============================================
+// RENDER: TECHNICAL ANALYSIS PRIMER
+// ============================================
+function renderTechAnalysis(container) {
+  container.innerHTML = `
+    <div class="panel" style="max-width:960px;">
+      <div class="panel-header"><h3>📊 Technical Analysis Primer</h3></div>
+      <div class="panel-body" style="line-height:1.7; font-size:0.85rem; color:var(--text-secondary);">
+
+        <p style="color:var(--text-primary); font-size:0.95rem; margin-bottom:16px;">
+          This page explains how the <strong style="color:var(--green);">Signal (Sig)</strong> column on your watchlists works, and introduces key technical analysis concepts for making better entry/exit decisions.
+        </p>
+
+        <!-- SIGNAL SYSTEM -->
+        <h4 style="color:var(--green); margin-top:24px; border-bottom:1px solid var(--border); padding-bottom:6px;">🚦 Our Signal System</h4>
+        <p>We use three proven indicators combined into a single composite signal:</p>
+
+        <table style="width:100%; border-collapse:collapse; margin:12px 0; font-size:0.8rem;">
+          <thead><tr style="border-bottom:2px solid var(--border);">
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Indicator</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">What It Tells You</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Logic</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;">Price vs 50-day MA</td>
+              <td style="padding:8px;">Short-term momentum</td>
+              <td style="padding:8px;">Above = bullish, Below = bearish</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;">50-day MA vs 200-day MA</td>
+              <td style="padding:8px;">Trend direction</td>
+              <td style="padding:8px;">Golden Cross = bullish, Death Cross = bearish</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;">RSI (14-day)</td>
+              <td style="padding:8px;">Overbought / Oversold</td>
+              <td style="padding:8px;">&lt;30 = oversold (buy), &gt;70 = overbought (caution)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h5 style="color:var(--text-primary); margin-top:20px;">Combined Signal Output:</h5>
+        <table style="width:100%; border-collapse:collapse; margin:12px 0; font-size:0.8rem;">
+          <thead><tr style="border-bottom:2px solid var(--border);">
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Signal</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Condition</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Display</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><span style="color:var(--green); font-weight:700;">● BUY</span></td>
+              <td style="padding:8px;">Price &gt; 50MA &gt; 200MA, RSI &lt; 70</td>
+              <td style="padding:8px;">Green "B" — uptrend with momentum, not overbought</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><span style="color:var(--yellow); font-weight:700;">● HOLD</span></td>
+              <td style="padding:8px;">Mixed (e.g., price &gt; 200MA but &lt; 50MA, or RSI 70–80)</td>
+              <td style="padding:8px;">Yellow "H" — trend unclear, stay patient</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><span style="color:var(--red); font-weight:700;">● SELL</span></td>
+              <td style="padding:8px;">Price &lt; 50MA &lt; 200MA, or RSI &gt; 80</td>
+              <td style="padding:8px;">Red "S" — downtrend or dangerously overbought</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><span style="color:var(--blue); font-weight:700;">● DIP</span></td>
+              <td style="padding:8px;">Price &gt; 200MA but pulled back near 50MA, RSI &lt; 40</td>
+              <td style="padding:8px;">Blue "D" — buy-the-dip opportunity in an uptrend</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p><strong>💡 The DIP signal</strong> is particularly useful — it catches stocks in an overall uptrend that have temporarily pulled back to a support level, offering a better entry price.</p>
+
+        <!-- MOVING AVERAGES -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">📈 Moving Averages (MA) Explained</h4>
+
+        <p>A <strong>Moving Average</strong> is simply the average closing price over the last N days. It smooths out daily noise and reveals the underlying trend.</p>
+
+        <h5 style="color:var(--text-primary); margin-top:16px;">Why 50-day and 200-day specifically?</h5>
+        <ul style="margin:8px 0 8px 20px;">
+          <li><strong>50-day MA</strong> ≈ ~10 weeks of trading. Captures the medium-term trend (roughly one quarter). Short enough to be responsive to real shifts, long enough to filter out week-to-week noise.</li>
+          <li><strong>200-day MA</strong> ≈ ~40 weeks of trading (nearly a full year). Represents the long-term secular trend. Institutional investors watch this line heavily.</li>
+          <li><strong>Why not 60 or 365?</strong> These are industry conventions dating back decades. The 50/200 pair is what the majority of traders and algorithms use, which makes them <em>self-fulfilling</em> — so many people watch these levels that they actually cause support/resistance at those prices.</li>
+        </ul>
+
+        <h5 style="color:var(--text-primary); margin-top:20px;">🏅 Golden Cross vs ☠️ Death Cross</h5>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:12px 0;">
+          <div style="background:var(--bg-card); border:1px solid var(--green); border-radius:8px; padding:12px;">
+            <strong style="color:var(--green);">Golden Cross</strong>
+            <p style="margin:6px 0 0;">The 50-day MA crosses <em>above</em> the 200-day MA. This signals that short-term momentum is now outpacing the long-term average — historically associated with the start of major bull runs.</p>
+            <p style="margin:8px 0 0; font-size:0.75rem; color:var(--text-dim);">Example: If AAPL's 50MA was at $180 and rising, and its 200MA was at $175, the crossing point marks a Golden Cross.</p>
+          </div>
+          <div style="background:var(--bg-card); border:1px solid var(--red); border-radius:8px; padding:12px;">
+            <strong style="color:var(--red);">Death Cross</strong>
+            <p style="margin:6px 0 0;">The 50-day MA crosses <em>below</em> the 200-day MA. Short-term momentum is now weaker than the long-term trend — often (but not always) precedes significant declines.</p>
+            <p style="margin:8px 0 0; font-size:0.75rem; color:var(--text-dim);">⚠️ Death Crosses can lag — by the time it triggers, much of the damage may already be done. Best used as confirmation, not prediction.</p>
+          </div>
+        </div>
+
+        <!-- RSI -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">⚡ RSI (Relative Strength Index) Explained</h4>
+
+        <p>RSI measures the speed and magnitude of recent price changes on a scale of 0–100. A 14-day RSI is the most common period.</p>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:12px 0;">
+          <div style="background:var(--bg-card); border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:1.5rem; color:var(--green);">RSI &lt; 30</div>
+            <strong style="color:var(--green);">Oversold</strong>
+            <p style="font-size:0.75rem; margin-top:4px;">Stock has dropped fast — may be due for a bounce. Potential buy signal if trend is still intact.</p>
+          </div>
+          <div style="background:var(--bg-card); border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:1.5rem; color:var(--text-secondary);">RSI 30–70</div>
+            <strong>Neutral</strong>
+            <p style="font-size:0.75rem; margin-top:4px;">Normal trading range. No extreme signal either way.</p>
+          </div>
+          <div style="background:var(--bg-card); border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:1.5rem; color:var(--red);">RSI &gt; 70</div>
+            <strong style="color:var(--red);">Overbought</strong>
+            <p style="font-size:0.75rem; margin-top:4px;">Stock has risen fast — may be stretched. Doesn't guarantee a drop, but advises caution.</p>
+          </div>
+        </div>
+
+        <p><strong>Important nuance:</strong> In strong uptrends, RSI can stay &gt;70 for weeks. That's why we use RSI &gt;80 (not 70) for our SELL signal — it represents an extreme.</p>
+
+        <!-- CHART PATTERNS -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">🎨 Common Chart Patterns</h4>
+        <p>Beyond MA/RSI, experienced traders look for visual patterns. Here are the most important ones:</p>
+
+        <div style="margin-top:16px;">
+          <!-- Head and Shoulders -->
+          <div style="background:var(--bg-card); border-radius:8px; padding:16px; margin-bottom:12px; border-left:3px solid var(--red);">
+            <h5 style="color:var(--red); margin:0 0 8px;">👤 Head and Shoulders (Bearish Reversal)</h5>
+            <div style="display:flex; gap:16px; align-items:flex-start;">
+              <pre style="font-size:0.7rem; color:var(--text-dim); line-height:1.3; background:var(--bg-secondary); padding:8px; border-radius:4px; flex-shrink:0;">
+      HEAD
+      /\\
+     /  \\
+ LS /    \\ RS
+ /\\      /\\
+/  \\    /  \\
+    \\  /    \\
+     \\/      \\  ← breakdown
+─────NECKLINE────</pre>
+              <div>
+                <p style="margin:0;"><strong>What it looks like:</strong> Three peaks — the middle one (head) is the highest, flanked by two lower peaks (left shoulder, right shoulder). The "neckline" connects the two troughs.</p>
+                <p style="margin:8px 0 0;"><strong>What it means:</strong> Buyers tried three times to push higher but failed. When price breaks below the neckline, it often signals a significant downtrend. The bigger the pattern (weeks/months), the more reliable.</p>
+                <p style="margin:8px 0 0; font-size:0.75rem; color:var(--text-dim);">Inverse Head & Shoulders (upside down) is the <span style="color:var(--green);">bullish</span> version — same logic in reverse.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Double Top / Bottom -->
+          <div style="background:var(--bg-card); border-radius:8px; padding:16px; margin-bottom:12px; border-left:3px solid var(--yellow);">
+            <h5 style="color:var(--yellow); margin:0 0 8px;">🔄 Double Top / Double Bottom</h5>
+            <div style="display:flex; gap:16px; align-items:flex-start;">
+              <pre style="font-size:0.7rem; color:var(--text-dim); line-height:1.3; background:var(--bg-secondary); padding:8px; border-radius:4px; flex-shrink:0;">
+Double Top (M):     Double Bottom (W):
+ /\\    /\\               \\/    \\/
+/  \\  /  \\         \\  /  \\  /
+    \\/    \\→drop    \\/    \\/→rise</pre>
+              <div>
+                <p style="margin:0;"><strong>Double Top ("M" shape):</strong> Price hits resistance twice and fails to break through. Bearish — expect a drop after the second failure.</p>
+                <p style="margin:8px 0 0;"><strong>Double Bottom ("W" shape):</strong> Price hits support twice and bounces. Bullish — the floor has been tested and held.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cup and Handle -->
+          <div style="background:var(--bg-card); border-radius:8px; padding:16px; margin-bottom:12px; border-left:3px solid var(--green);">
+            <h5 style="color:var(--green); margin:0 0 8px;">☕ Cup and Handle (Bullish Continuation)</h5>
+            <div style="display:flex; gap:16px; align-items:flex-start;">
+              <pre style="font-size:0.7rem; color:var(--text-dim); line-height:1.3; background:var(--bg-secondary); padding:8px; border-radius:4px; flex-shrink:0;">
+\\              /\\  /→ breakout
+ \\            /  \\/
+  \\          / (handle)
+   \\   CUP  /
+    \\_____/</pre>
+              <div>
+                <p style="margin:0;"><strong>What it looks like:</strong> A rounded "U" shape (the cup) followed by a small pullback (the handle), then a breakout above the rim.</p>
+                <p style="margin:8px 0 0;"><strong>What it means:</strong> The stock consolidated, formed a base, and then broke out with renewed buying pressure. William O'Neil (founder of Investor's Business Daily) considered this the most reliable bullish pattern.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bull/Bear Flag -->
+          <div style="background:var(--bg-card); border-radius:8px; padding:16px; margin-bottom:12px; border-left:3px solid var(--blue);">
+            <h5 style="color:var(--blue); margin:0 0 8px;">🚩 Bull Flag / Bear Flag (Continuation)</h5>
+            <div style="display:flex; gap:16px; align-items:flex-start;">
+              <pre style="font-size:0.7rem; color:var(--text-dim); line-height:1.3; background:var(--bg-secondary); padding:8px; border-radius:4px; flex-shrink:0;">
+Bull Flag:          Bear Flag:
+    /→breakout           \\
+   / ══╗                  \\ ══╗
+  /  ══╝(flag)             \\══╝(flag)
+ / (pole)                   \\ (pole)
+/                            \\→breakdown</pre>
+              <div>
+                <p style="margin:0;"><strong>Bull Flag:</strong> A sharp rise (pole) followed by a small, tight consolidation drifting down (flag). The breakout continues the uptrend.</p>
+                <p style="margin:8px 0 0;"><strong>Bear Flag:</strong> A sharp drop followed by a small bounce/consolidation, then continuation downward.</p>
+                <p style="margin:8px 0 0; font-size:0.75rem; color:var(--text-dim);">Flags are short-lived (days to 2 weeks). If the "flag" lasts more than 3 weeks, the pattern weakens.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Support & Resistance -->
+          <div style="background:var(--bg-card); border-radius:8px; padding:16px; margin-bottom:12px; border-left:3px solid var(--text-secondary);">
+            <h5 style="color:var(--text-primary); margin:0 0 8px;">📏 Support & Resistance Levels</h5>
+            <div>
+              <p style="margin:0;"><strong>Support:</strong> A price level where buying interest is strong enough to prevent further decline. Think of it as a "floor." Each time the price bounces off this level, it becomes stronger.</p>
+              <p style="margin:8px 0 0;"><strong>Resistance:</strong> A price level where selling pressure prevents further advance. A "ceiling." Once broken, old resistance often becomes new support.</p>
+              <p style="margin:8px 0 0;"><strong>How MAs act as support/resistance:</strong> The 50-day and 200-day MAs frequently serve as dynamic support/resistance lines. When a stock "bounces off the 200-day MA," that's exactly this concept in action — and that's what our DIP signal captures.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- LIMITATIONS -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">⚠️ Limitations & Caveats</h4>
+        <ul style="margin:8px 0 8px 20px;">
+          <li><strong>Technical analysis is not a crystal ball.</strong> It shows probabilities, not certainties. Always combine with fundamentals (P/E, earnings growth, sector trends).</li>
+          <li><strong>Lagging indicators:</strong> Moving averages are backward-looking. By the time a Golden Cross fires, the stock may already be 10–15% off its bottom.</li>
+          <li><strong>False signals:</strong> In choppy/sideways markets, MAs will whipsaw. The signal may flip B→H→S→B rapidly — this is noise, not signal.</li>
+          <li><strong>Sector context matters:</strong> High-growth tech with RSI 75 may keep running. Utility stocks with RSI 75 are likely overextended. Context is king.</li>
+          <li><strong>Volume confirms:</strong> A breakout on high volume is far more trustworthy than one on low volume. (We show volume in the Vol column for this reason.)</li>
+        </ul>
+
+        <div style="background:var(--bg-card); border:1px solid var(--green); border-radius:8px; padding:16px; margin-top:24px;">
+          <p style="margin:0; color:var(--text-primary);"><strong>🎯 Bottom Line:</strong> Use the Sig column as a <em>starting point</em>, not a final verdict. A green "B" doesn't mean "buy blindly" — it means the technicals favor an entry. Pair it with the P/E, PEG, and analyst targets on the same row to make a well-rounded decision.</p>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
 function renderSectors(container) {
   container.innerHTML = `
     <div class="panel">
