@@ -167,19 +167,20 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" class="active" data-view="overview">Overview</a>
     <a href="#" data-view="portfolio">Portfolio</a>
     <div class="section-label">Watchlists</div>
-    <a href="#" data-view="watchlist" style="padding-left:28px;">Stocks</a>
-    <a href="#" data-view="semiconductors" style="padding-left:28px;">Semiconductors</a>
-    <a href="#" data-view="retail" style="padding-left:28px;">Retail</a>
-    <a href="#" data-view="staples" style="padding-left:28px;">Staples</a>
-    <a href="#" data-view="travel" style="padding-left:28px;">Travel</a>
-    <a href="#" data-view="logistics" style="padding-left:28px;">Logistics</a>
-    <a href="#" data-view="fintech" style="padding-left:28px;">Fintech</a>
-    <a href="#" data-view="ev" style="padding-left:28px;">EV</a>
     <a href="#" data-view="etfs" style="padding-left:28px;">ETFs &amp; Funds</a>
-    <a href="#" data-view="vanguard" style="padding-left:28px;">Vanguard</a>
+    <a href="#" data-view="ev" style="padding-left:28px;">EV</a>
     <a href="#" data-view="fidelity" style="padding-left:28px;">Fidelity</a>
+    <a href="#" data-view="fintech" style="padding-left:28px;">Fintech</a>
+    <a href="#" data-view="logistics" style="padding-left:28px;">Logistics</a>
+    <a href="#" data-view="retail" style="padding-left:28px;">Retail</a>
+    <a href="#" data-view="semiconductors" style="padding-left:28px;">Semiconductors</a>
+    <a href="#" data-view="staples" style="padding-left:28px;">Staples</a>
+    <a href="#" data-view="watchlist" style="padding-left:28px;">Stocks</a>
+    <a href="#" data-view="travel" style="padding-left:28px;">Travel</a>
+    <a href="#" data-view="vanguard" style="padding-left:28px;">Vanguard</a>
     <div class="section-label">Research</div>
     <a href="#" data-view="tech-analysis">Technical Analysis</a>
+    <a href="#" data-view="fair-value">Fair Value Calculation</a>
     <a href="#" data-view="news">News &amp; Analysts</a>
     <a href="#" data-view="sectors">Sector Heatmap</a>
     <a href="#" data-view="macro">Macro &amp; Economy</a>
@@ -373,6 +374,7 @@ function loadView(view) {
     case 'earnings': renderEarnings(main); break;
     case 'sectors': renderSectors(main); break;
     case 'tech-analysis': renderTechAnalysis(main); break;
+    case 'fair-value': renderFairValuePrimer(main); break;
     case 'macro': renderMacro(main); break;
     case 'valuation': renderValuation(main); break;
     case 'notes': renderNotes(main); break;
@@ -616,6 +618,7 @@ function renderWatchlist(container, category, title) {
               <th>Earnings</th>
               <th>52W Hi</th>
               <th>52W Lo</th>
+              <th>FV</th>
               <th>Analyst Lo</th>
               <th>Analyst Mid</th>
               <th>Analyst Hi</th>
@@ -627,7 +630,7 @@ function renderWatchlist(container, category, title) {
             ${tickers.map(t => `
               <tr>
                 <td class="ticker-cell" onclick="loadStockView('${t}')">${t}</td>
-                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
                 <td><a href="https://stockanalysis.com/stocks/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://www.macrotrends.net/stocks/charts/${t}/x/stock-price-history" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">MT</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
               </tr>
             `).join('')}
@@ -725,9 +728,9 @@ async function fetchWatchlistData(tickers, tbodyId) {
                 const row = tbody.children[i];
                 if (row) {
                   const cells = row.cells;
-                  cells[15].textContent = `$${Math.round(low)}`;
-                  cells[16].textContent = `$${Math.round(median)}`;
-                  cells[17].textContent = `$${Math.round(high)}`;
+                  cells[16].textContent = `$${Math.round(low)}`;
+                  cells[17].textContent = `$${Math.round(median)}`;
+                  cells[18].textContent = `$${Math.round(high)}`;
                 }
               }
             }
@@ -769,6 +772,44 @@ async function fetchWatchlistData(tickers, tbodyId) {
         cells[10].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
         cells[13].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
         cells[14].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
+
+        // Fair Value (FV) — multi-model blended estimate
+        const eps = m.epsNormalizedAnnual;
+        const epsGrowth = m.epsGrowthTTMYoy;
+        const bookVal = m.bookValuePerShareAnnual;
+        const currentPrice = parseFloat(cells[2].textContent.replace('$',''));
+        if (eps && eps > 0) {
+          let models = [];
+          let tips = [];
+          // Model 1: DCF-Lite (2-stage: TTM growth for 5yr, 3% terminal, 10% discount)
+          const g = epsGrowth ? Math.min(Math.max(epsGrowth / 100, -0.2), 0.5) : 0.08;
+          let dcfSum = 0;
+          for (let yr = 1; yr <= 5; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1.10, yr);
+          const terminalEPS = eps * Math.pow(1 + g, 5) * (1 + 0.03);
+          const terminalVal = terminalEPS / (0.10 - 0.03);
+          const pvTerminal = terminalVal / Math.pow(1.10, 5);
+          const dcfFV = dcfSum + pvTerminal;
+          if (dcfFV > 0 && dcfFV < currentPrice * 10) { models.push(dcfFV); tips.push(`DCF: $${dcfFV.toFixed(0)}`); }
+          // Model 2: Graham Number
+          if (bookVal && bookVal > 0) {
+            const graham = Math.sqrt(22.5 * eps * bookVal);
+            if (graham > 0) { models.push(graham); tips.push(`Graham: $${graham.toFixed(0)}`); }
+          }
+          // Model 3: PEG Fair Value (fair P/E = growth rate)
+          if (epsGrowth && epsGrowth > 0) {
+            const fairPE = Math.min(epsGrowth, 40);
+            const pegFV = fairPE * eps;
+            if (pegFV > 0) { models.push(pegFV); tips.push(`PEG: $${pegFV.toFixed(0)}`); }
+          }
+          // Blended average
+          if (models.length > 0) {
+            const blended = models.reduce((a, b) => a + b, 0) / models.length;
+            const gap = ((blended - currentPrice) / currentPrice * 100).toFixed(0);
+            const fvColor = blended > currentPrice * 1.1 ? 'var(--green)' : blended < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
+            const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%)`;
+            cells[15].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
+          }
+        }
       }
 
       // Historical P/E (5Y median from Macrotrends)
@@ -1158,6 +1199,184 @@ Bull Flag:          Bear Flag:
 
         <div style="background:var(--bg-card); border:1px solid var(--green); border-radius:8px; padding:16px; margin-top:24px;">
           <p style="margin:0; color:var(--text-primary);"><strong>🎯 Bottom Line:</strong> Use the Sig column as a <em>starting point</em>, not a final verdict. A green "B" doesn't mean "buy blindly" — it means the technicals favor an entry. Pair it with the P/E, PEG, and analyst targets on the same row to make a well-rounded decision.</p>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+// ============================================
+// RENDER: FAIR VALUE PRIMER
+// ============================================
+function renderFairValuePrimer(container) {
+  container.innerHTML = `
+    <div class="panel" style="max-width:960px;">
+      <div class="panel-header"><h3>💰 Fair Value Calculation Primer</h3></div>
+      <div class="panel-body" style="line-height:1.7; font-size:0.85rem; color:var(--text-secondary);">
+
+        <p style="color:var(--text-primary); font-size:0.95rem; margin-bottom:16px;">
+          This page explains how the <strong style="color:var(--green);">FV (Fair Value)</strong> column on your watchlists works. It provides a calculated intrinsic value estimate as another dimension alongside the analyst price targets.
+        </p>
+
+        <!-- WHAT IS IT -->
+        <h4 style="color:var(--green); margin-top:24px; border-bottom:1px solid var(--border); padding-bottom:6px;">📐 What Is the FV Column?</h4>
+        <p>The FV column shows a <strong>blended fair value estimate</strong> derived from three independent valuation models. The number is color-coded:</p>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:12px 0;">
+          <div style="background:var(--bg-card); border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:1.2rem; color:var(--green);">$XXX</div>
+            <strong style="color:var(--green);">Undervalued</strong>
+            <p style="font-size:0.75rem; margin-top:4px;">FV is >10% above current price. Stock may be trading below its intrinsic worth.</p>
+          </div>
+          <div style="background:var(--bg-card); border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:1.2rem; color:var(--text-primary);">$XXX</div>
+            <strong>Fairly Valued</strong>
+            <p style="font-size:0.75rem; margin-top:4px;">FV is within ±10% of current price. Stock is near its estimated intrinsic value.</p>
+          </div>
+          <div style="background:var(--bg-card); border-radius:8px; padding:12px; text-align:center;">
+            <div style="font-size:1.2rem; color:var(--red);">$XXX</div>
+            <strong style="color:var(--red);">Overvalued</strong>
+            <p style="font-size:0.75rem; margin-top:4px;">FV is >10% below current price. Stock may be trading above its intrinsic worth.</p>
+          </div>
+        </div>
+        <p>Hover over the FV value to see the breakdown from each model and the percentage gap.</p>
+
+        <!-- THREE MODELS -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">🧮 The Three Models</h4>
+
+        <table style="width:100%; border-collapse:collapse; margin:12px 0; font-size:0.8rem;">
+          <thead><tr style="border-bottom:2px solid var(--border);">
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Model</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">What It Does</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Formula</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Best For</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong style="color:var(--blue);">DCF-Lite</strong></td>
+              <td style="padding:8px;">Projects future earnings and discounts them back to today's dollars</td>
+              <td style="padding:8px; font-family:'IBM Plex Mono',monospace; font-size:0.7rem;">Sum of (EPS × (1+g)^n / 1.10^n) for years 1–5, plus terminal value at 3% perpetual growth</td>
+              <td style="padding:8px;">Growth stocks with positive earnings</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong style="color:var(--purple);">Graham Number</strong></td>
+              <td style="padding:8px;">Classic value investing floor based on earnings and book value</td>
+              <td style="padding:8px; font-family:'IBM Plex Mono',monospace; font-size:0.7rem;">√(22.5 × EPS × Book Value per Share)</td>
+              <td style="padding:8px;">Mature, asset-heavy companies (banks, industrials, REITs)</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong style="color:var(--yellow);">PEG Fair Value</strong></td>
+              <td style="padding:8px;">Assigns a P/E ratio equal to the earnings growth rate (PEG=1 thesis)</td>
+              <td style="padding:8px; font-family:'IBM Plex Mono',monospace; font-size:0.7rem;">Fair P/E (capped at 40) × EPS</td>
+              <td style="padding:8px;">Growth companies where earnings growth is the primary driver</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p>The final <strong>FV</strong> is a simple average of whichever models produce a valid result for that ticker. If only one model fires (e.g., no book value data for Graham), the FV is based on the remaining models.</p>
+
+        <!-- DCF DEEP DIVE -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">📈 DCF-Lite Explained</h4>
+        <p>This is a simplified <strong>Discounted Cash Flow</strong> model — the same core methodology used by SimplyWallStreet, VectorVest, and professional equity analysts. Here's how it works:</p>
+        <ol style="margin:12px 0 12px 20px;">
+          <li><strong>Take current EPS</strong> (normalized, trailing 12 months)</li>
+          <li><strong>Grow it</strong> at the trailing EPS growth rate for 5 years (clamped between -20% and +50% to avoid absurd projections)</li>
+          <li><strong>Discount each year's earnings</strong> back at 10% (a standard equity risk premium)</li>
+          <li><strong>Add a terminal value</strong>: after year 5, assume perpetual growth at 3% (roughly GDP/inflation). The terminal value = Year 5 EPS × (1.03) / (0.10 - 0.03), discounted back 5 years.</li>
+          <li><strong>Sum it all up</strong> = the stock's intrinsic value per share</li>
+        </ol>
+
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:16px; margin:16px 0;">
+          <p style="margin:0; font-family:'IBM Plex Mono',monospace; font-size:0.8rem; color:var(--text-primary);">
+            Example: NVDA with EPS=$2.50, growth=50% (capped), discount=10%<br>
+            Year 1: $2.50×1.5 / 1.1 = $3.41<br>
+            Year 2: $2.50×1.5² / 1.1² = $4.65<br>
+            ... (years 3–5)<br>
+            Terminal: ($2.50×1.5⁵×1.03) / 0.07 / 1.1⁵ = $71.08<br>
+            <strong>FV ≈ $93</strong> (sum of all)
+          </p>
+        </div>
+
+        <!-- GRAHAM -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">📚 Graham Number Explained</h4>
+        <p>Invented by <strong>Benjamin Graham</strong> (Warren Buffett's mentor), this formula defines the maximum price a conservative investor should pay:</p>
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:16px; margin:16px 0;">
+          <p style="margin:0; font-family:'IBM Plex Mono',monospace; font-size:0.9rem; color:var(--text-primary);">
+            Graham Number = √(22.5 × EPS × BVPS)
+          </p>
+          <p style="margin:8px 0 0; font-size:0.75rem; color:var(--text-dim);">Where 22.5 = 15 (fair P/E) × 1.5 (fair P/B). Graham believed no stock should trade above 15× earnings AND 1.5× book value simultaneously.</p>
+        </div>
+        <p>This model produces <strong>conservative estimates</strong>. It works best for mature companies with tangible assets. It will significantly undervalue asset-light tech companies (which is by design — Graham would say "then don't buy it at this price").</p>
+
+        <!-- PEG -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">⚡ PEG Fair Value Explained</h4>
+        <p>The <strong>PEG ratio</strong> (Price/Earnings-to-Growth) was popularized by Peter Lynch. The thesis: a fairly valued stock should have a P/E ratio roughly equal to its earnings growth rate (PEG = 1.0).</p>
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:16px; margin:16px 0;">
+          <p style="margin:0; font-family:'IBM Plex Mono',monospace; font-size:0.9rem; color:var(--text-primary);">
+            Fair Value = EPS Growth Rate (%) × EPS
+          </p>
+          <p style="margin:8px 0 0; font-size:0.75rem; color:var(--text-dim);">Example: EPS=$5, growth=25% → Fair P/E=25 → FV = 25 × $5 = $125. Capped at 40× to avoid absurd valuations for hyper-growth names.</p>
+        </div>
+        <p>This only fires when growth is positive. For declining-earnings companies, only DCF and Graham are used.</p>
+
+        <!-- LIMITATIONS -->
+        <h4 style="color:var(--red); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">⚠️ Limitations & Caveats</h4>
+        <ul style="margin:8px 0 8px 20px;">
+          <li><strong>Backward-looking growth estimates.</strong> We use trailing-twelve-month (TTM) EPS growth, not analyst consensus forward estimates. This means the model reflects <em>what happened</em>, not <em>what's expected</em>. A company that just had a blowout quarter will look cheap; one entering a downturn will look expensive.</li>
+          <li><strong>No free cash flow data.</strong> Professional DCFs use free cash flow (FCF), not EPS. EPS can be manipulated by accounting choices (depreciation, stock-based comp, one-time charges). Our model uses normalized EPS as the closest available proxy from Finnhub's free tier.</li>
+          <li><strong>Single discount rate.</strong> We use a flat 10% discount rate for all stocks. In reality, a utility should use ~7% and a speculative biotech ~15%. This oversimplifies risk.</li>
+          <li><strong>Growth rate clamping.</strong> We cap growth at +50% and floor it at -20%. This prevents absurd FV estimates but also means hyper-growth or deeply cyclical stocks won't be accurately modeled.</li>
+          <li><strong>No sector-specific adjustments.</strong> REITs, banks, and utilities have fundamentally different valuation frameworks (NAV, dividend discount, regulated asset base). Our one-size-fits-all approach will be less accurate for these sectors.</li>
+          <li><strong>Graham Number undervalues tech.</strong> Asset-light companies (SaaS, platforms) have low book value, making Graham systematically conservative. This is a feature, not a bug — but it pulls the blended FV down for tech names.</li>
+          <li><strong>Not a substitute for VectorVest or SimplyWallStreet.</strong> Those platforms use proprietary models with forward earnings consensus, sector-relative comparisons, and institutional data feeds we cannot access. Our FV is a <em>directional sanity check</em>, not a professional-grade valuation.</li>
+          <li><strong>Only works with positive EPS.</strong> Pre-profit companies (many in EV, biotech, fintech) will show no FV because earnings-based models are meaningless when EPS is negative.</li>
+        </ul>
+
+        <!-- COMPARISON -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">🔍 How This Compares to VectorVest & SimplyWallStreet</h4>
+        <table style="width:100%; border-collapse:collapse; margin:12px 0; font-size:0.8rem;">
+          <thead><tr style="border-bottom:2px solid var(--border);">
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Feature</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">VectorVest</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">SimplyWallStreet</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Our FV</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;">Growth Input</td>
+              <td style="padding:8px;">Proprietary forecast</td>
+              <td style="padding:8px;">Analyst consensus (forward)</td>
+              <td style="padding:8px;">TTM EPS growth (backward)</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;">Cash Flow</td>
+              <td style="padding:8px;">Uses FCF</td>
+              <td style="padding:8px;">Uses FCF</td>
+              <td style="padding:8px;">Uses EPS (proxy)</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;">Models</td>
+              <td style="padding:8px;">Proprietary single model</td>
+              <td style="padding:8px;">2-stage DCF</td>
+              <td style="padding:8px;">3-model blend (DCF + Graham + PEG)</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;">Discount Rate</td>
+              <td style="padding:8px;">Risk-adjusted per stock</td>
+              <td style="padding:8px;">WACC-based</td>
+              <td style="padding:8px;">Flat 10%</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;">Cost</td>
+              <td style="padding:8px;">$69–$149/mo</td>
+              <td style="padding:8px;">$0–$20/mo</td>
+              <td style="padding:8px;">Free (built-in)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="background:var(--bg-card); border:1px solid var(--green); border-radius:8px; padding:16px; margin-top:24px;">
+          <p style="margin:0; color:var(--text-primary);"><strong>🎯 Bottom Line:</strong> The FV column is a <em>directional indicator</em> — not a precise target. Use it alongside Analyst Lo/Mid/Hi to triangulate. If FV and analyst consensus both say "undervalued," that's a stronger signal than either alone. When they diverge significantly, dig deeper into why.</p>
         </div>
 
       </div>
