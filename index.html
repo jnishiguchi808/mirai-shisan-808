@@ -598,6 +598,7 @@ function renderWatchlist(container, category, title) {
               <th>Chg $</th>
               <th>Chg %</th>
               <th>P/E</th>
+              <th>5Y P/E</th>
               <th>P/B</th>
               <th>Beta</th>
               <th>Div %</th>
@@ -616,7 +617,7 @@ function renderWatchlist(container, category, title) {
             ${tickers.map(t => `
               <tr>
                 <td class="ticker-cell" onclick="loadStockView('${t}')">${t}</td>
-                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
                 <td><a href="https://stockanalysis.com/stocks/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
               </tr>
             `).join('')}
@@ -655,7 +656,7 @@ async function fetchWatchlistData(tickers, tbodyId) {
         // Volume from quote
         if (q.v) {
           const vol = q.v >= 1e6 ? `${(q.v/1e6).toFixed(1)}M` : q.v >= 1e3 ? `${(q.v/1e3).toFixed(0)}K` : `${q.v}`;
-          cells[15].textContent = vol;
+          cells[16].textContent = vol;
         }
       }
 
@@ -677,9 +678,9 @@ async function fetchWatchlistData(tickers, tbodyId) {
                 const row = tbody.children[i];
                 if (row) {
                   const cells = row.cells;
-                  cells[12].textContent = `$${Math.round(low)}`;
-                  cells[13].textContent = `$${Math.round(median)}`;
-                  cells[14].textContent = `$${Math.round(high)}`;
+                  cells[13].textContent = `$${Math.round(low)}`;
+                  cells[14].textContent = `$${Math.round(median)}`;
+                  cells[15].textContent = `$${Math.round(high)}`;
                 }
               }
             }
@@ -696,21 +697,60 @@ async function fetchWatchlistData(tickers, tbodyId) {
         const cells = row.cells;
         const m = met.metric;
         cells[4].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
-        cells[5].textContent = m.pbAnnual?.toFixed(2) || '—';
-        cells[6].textContent = m.beta?.toFixed(2) || '—';
-        cells[7].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
-        cells[8].textContent = m.exDividendDate ? m.exDividendDate.replace(/-/g,'/') : '—';
-        cells[10].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
-        cells[11].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
+        cells[6].textContent = m.pbAnnual?.toFixed(2) || '—';
+        cells[7].textContent = m.beta?.toFixed(2) || '—';
+        cells[8].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
+        cells[9].textContent = m.exDividendDate ? m.exDividendDate.replace(/-/g,'/') : '—';
+        cells[11].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
+        cells[12].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
         // Highlight if ex-div within 7 days
         if (m.exDividendDate) {
           const daysUntil = Math.ceil((new Date(m.exDividendDate) - new Date()) / (1000*60*60*24));
-          if (daysUntil >= 0 && daysUntil <= 7) cells[8].innerHTML = `<span class="highlight-soon">${m.exDividendDate.replace(/-/g,'/')}</span>`;
+          if (daysUntil >= 0 && daysUntil <= 7) cells[9].innerHTML = `<span class="highlight-soon">${m.exDividendDate.replace(/-/g,'/')}</span>`;
         }
       }
 
+      // Historical P/E (5Y median from Macrotrends)
+      try {
+        const mtUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.macrotrends.net/stocks/charts/${ticker}/x/pe-ratio`)}`;
+        const mtRes = await fetch(mtUrl);
+        if (mtRes.ok) {
+          const html = await mtRes.text();
+          const peMatches = [...html.matchAll(/<td[^>]*>(\d{4}-\d{2}-\d{2})<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/g)];
+          if (peMatches.length > 0) {
+            const fiveYearsAgo = new Date();
+            fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+            const recentPEs = peMatches
+              .filter(m => new Date(m[1]) >= fiveYearsAgo)
+              .map(m => parseFloat(m[2]))
+              .filter(v => v > 0 && v < 1000);
+            if (recentPEs.length >= 4) {
+              recentPEs.sort((a, b) => a - b);
+              const mid = Math.floor(recentPEs.length / 2);
+              const median5Y = recentPEs.length % 2 === 0
+                ? (recentPEs[mid - 1] + recentPEs[mid]) / 2
+                : recentPEs[mid];
+              const row = tbody.children[i];
+              if (row) {
+                const cells = row.cells;
+                const currentPE = parseFloat(cells[4].textContent);
+                const mtLink = `https://www.macrotrends.net/stocks/charts/${ticker}/x/pe-ratio`;
+                if (currentPE && currentPE > 0) {
+                  const dev = ((currentPE - median5Y) / median5Y * 100).toFixed(0);
+                  const color = dev > 0 ? 'var(--red)' : 'var(--green)';
+                  const sign = dev > 0 ? '+' : '';
+                  cells[5].innerHTML = `<a href="${mtLink}" target="_blank" style="color:${color}; text-decoration:underline; text-decoration-style:dotted;">${median5Y.toFixed(1)} (${sign}${dev}%)</a>`;
+                } else {
+                  cells[5].innerHTML = `<a href="${mtLink}" target="_blank" style="color:var(--text-secondary); text-decoration:underline; text-decoration-style:dotted;">${median5Y.toFixed(1)}</a>`;
+                }
+              }
+            }
+          }
+        }
+      } catch(e) { /* Macrotrends fetch failed, skip */ }
+
     } catch(e) { /* skip */ }
-    // Throttle: 2 Finnhub calls + 1 StockAnalysis per ticker. Finnhub free = 60/min → pause every ticker
+    // Throttle: 2 Finnhub + 1 StockAnalysis + 1 Macrotrends per ticker
     await new Promise(r => setTimeout(r, 2200));
   }
 }
