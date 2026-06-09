@@ -173,6 +173,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="staples" style="padding-left:28px;">Staples</a>
     <a href="#" data-view="travel" style="padding-left:28px;">Travel</a>
     <a href="#" data-view="logistics" style="padding-left:28px;">Logistics</a>
+    <a href="#" data-view="fintech" style="padding-left:28px;">Fintech</a>
     <a href="#" data-view="etfs" style="padding-left:28px;">ETFs &amp; Funds</a>
     <a href="#" data-view="vanguard" style="padding-left:28px;">Vanguard</a>
     <a href="#" data-view="fidelity" style="padding-left:28px;">Fidelity</a>
@@ -220,6 +221,7 @@ const WATCHLIST = {
   staples: ['PG','CPB','CLX'],
   travel: ['MAR','DAL','H','AAL','CCL','UAL','ALK','BA','ABNB'],
   logistics: ['MATX','RXO','CHRW','SBLK','DHLGY','FDX','XPO','GSL','DAC','AMKBY','GNK','UNP','UPS','ZIM'],
+  fintech: ['APPS','CBOE','PAYC','AXP','V','INTU','MA','SNOW','UPST','SE','XYZ','AFRM','SHOP','NU','TIGR','ARKF','PYPL','PAGS','STNE','MQ','PSFE','COIN'],
   fidelity: ['FTEC','FCLD','FDTX','FBCG','FDIG','FDRV','FFLG','FMET','FBOT','ONEQ','FEMR','FDIF','FDMO','FESM','FFEM','FDCF','FELG','FDEM','FELC','FFLC','FFSM','FMAG','FVAL','FELV','FFGX','FSMD','FDRR','FIDU','FQAL','FCPI','FLRG','FMDE','FRNW','FBCV','FFDI','FDVV','FENI','FIVA','FDBC','FDLO','FCOM','FPRO','FDIS','FEAC','FFLV','FHLC','FNCL','FSEV','FBUF','FIDI'],
   vanguard: ['VGT','VOOG','VTWG','MGK','VUG','VBK','VFMO','VONG','VOT','VPL','VTWO','MGC','VEXC','VOO','VTHR','VTI','VV','VXF','IVOG','VIOG','VONE','VSGX','VB','VIOO','VT','VTWV','IVOO','VFMF','VIOV','VIS','VONV','VEA','VEU','VXUS','VO','MGV','VBR','VIG','VTV','VWO','IVOV','VGK','VOOV','VSS','VFQY','VOE','VYM','VNQ','VOX','VCR']
 };
@@ -361,6 +363,7 @@ function loadView(view) {
     case 'staples': renderWatchlist(main, 'staples', 'Staples Watchlist'); break;
     case 'travel': renderWatchlist(main, 'travel', 'Travel Watchlist'); break;
     case 'logistics': renderWatchlist(main, 'logistics', 'Logistics Watchlist'); break;
+    case 'fintech': renderWatchlist(main, 'fintech', 'Fintech Watchlist'); break;
     case 'vanguard': renderWatchlist(main, 'vanguard', 'Vanguard Watchlist'); break;
     case 'fidelity': renderWatchlist(main, 'fidelity', 'Fidelity Watchlist'); break;
     case 'portfolio': renderPortfolio(main); break;
@@ -601,9 +604,9 @@ function renderWatchlist(container, category, title) {
               <th>Chg $</th>
               <th>Chg %</th>
               <th>Beta</th>
+              <th>P/B</th>
               <th>P/E</th>
               <th>5Y P/E</th>
-              <th>P/B</th>
               <th>PEG</th>
               <th>Div %</th>
               <th>Ex-Div</th>
@@ -738,8 +741,8 @@ async function fetchWatchlistData(tickers, tbodyId) {
         const cells = row.cells;
         const m = met.metric;
         cells[5].textContent = m.beta?.toFixed(2) || '—';
-        cells[6].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
-        cells[8].textContent = m.pbAnnual?.toFixed(2) || '—';
+        cells[6].textContent = m.pbAnnual?.toFixed(2) || '—';
+        cells[7].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
         // PEG with color-coding and growth tooltip
         const peg = m.forwardPEG || m.pegTTM;
         const growth = m.epsGrowthTTMYoy;
@@ -788,15 +791,15 @@ async function fetchWatchlistData(tickers, tbodyId) {
               const row = tbody.children[i];
               if (row) {
                 const cells = row.cells;
-                const currentPE = parseFloat(cells[6].textContent);
+                const currentPE = parseFloat(cells[7].textContent);
                 const mtLink = `https://www.macrotrends.net/stocks/charts/${ticker}/x/pe-ratio`;
                 if (currentPE && currentPE > 0) {
                   const dev = ((currentPE - median5Y) / median5Y * 100).toFixed(0);
                   const color = dev > 0 ? 'var(--red)' : 'var(--green)';
                   const sign = dev > 0 ? '+' : '';
-                  cells[7].innerHTML = `<a href="${mtLink}" target="_blank" style="color:${color}; text-decoration:none;">${median5Y.toFixed(1)} (${sign}${dev}%)</a>`;
+                  cells[8].innerHTML = `<a href="${mtLink}" target="_blank" style="color:${color}; text-decoration:none;">${median5Y.toFixed(1)} (${sign}${dev}%)</a>`;
                 } else {
-                  cells[7].innerHTML = `<a href="${mtLink}" target="_blank" style="color:var(--text-secondary); text-decoration:none;">${median5Y.toFixed(1)}</a>`;
+                  cells[8].innerHTML = `<a href="${mtLink}" target="_blank" style="color:var(--text-secondary); text-decoration:none;">${median5Y.toFixed(1)}</a>`;
                 }
               }
             }
