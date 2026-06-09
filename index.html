@@ -175,7 +175,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="defense" style="padding-left:28px;">Defense</a>
     <a href="#" data-view="energy-old" style="padding-left:28px;">Energy (Old)</a>
     <a href="#" data-view="energy-new" style="padding-left:28px;">Energy (New)</a>
-    <a href="#" data-view="fidelity" style="padding-left:28px;">Fidelity</a>
+    <a href="#" data-view="fidelity" style="padding-left:28px;">ETF (Fidelity)</a>
     <a href="#" data-view="fintech" style="padding-left:28px;">Fintech</a>
     <a href="#" data-view="gambling" style="padding-left:28px;">Gambling</a>
     <a href="#" data-view="insurance" style="padding-left:28px;">Insurance</a>
@@ -185,7 +185,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="staples" style="padding-left:28px;">Staples</a>
     <a href="#" data-view="watchlist" style="padding-left:28px;">Stocks</a>
     <a href="#" data-view="travel" style="padding-left:28px;">Travel</a>
-    <a href="#" data-view="vanguard" style="padding-left:28px;">Vanguard</a>
+    <a href="#" data-view="vanguard" style="padding-left:28px;">ETF (Vanguard)</a>
     <div class="section-label">Research</div>
     <a href="#" data-view="tech-analysis">Technical Analysis</a>
     <a href="#" data-view="fair-value">Fair Value Calculation</a>
@@ -392,8 +392,8 @@ function loadView(view) {
     case 'energy-new': renderWatchlist(main, 'energy_new', 'Energy (New) Watchlist'); break;
     case 'gambling': renderWatchlist(main, 'gambling', 'Gambling Watchlist'); break;
     case 'insurance': renderWatchlist(main, 'insurance', 'Insurance Watchlist'); break;
-    case 'vanguard': renderWatchlist(main, 'vanguard', 'Vanguard Watchlist'); break;
-    case 'fidelity': renderWatchlist(main, 'fidelity', 'Fidelity Watchlist'); break;
+    case 'vanguard': renderWatchlist(main, 'vanguard', 'ETF (Vanguard) Watchlist'); break;
+    case 'fidelity': renderWatchlist(main, 'fidelity', 'ETF (Fidelity) Watchlist'); break;
     case 'portfolio': renderPortfolio(main); break;
     case 'earnings': renderEarnings(main); break;
     case 'sectors': renderSectors(main); break;
