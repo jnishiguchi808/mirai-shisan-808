@@ -601,6 +601,7 @@ function renderWatchlist(container, category, title) {
               <th>P/E</th>
               <th>5Y P/E</th>
               <th>P/B</th>
+              <th>PEG</th>
               <th>Div %</th>
               <th>Ex-Div</th>
               <th>Earnings</th>
@@ -617,7 +618,7 @@ function renderWatchlist(container, category, title) {
             ${tickers.map(t => `
               <tr>
                 <td class="ticker-cell" onclick="loadStockView('${t}')">${t}</td>
-                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
                 <td><a href="https://stockanalysis.com/stocks/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://www.macrotrends.net/stocks/charts/${t}/x/stock-price-history" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">MT</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
               </tr>
             `).join('')}
@@ -656,7 +657,7 @@ async function fetchWatchlistData(tickers, tbodyId) {
         // Volume from quote
         if (q.v) {
           const vol = q.v >= 1e6 ? `${(q.v/1e6).toFixed(1)}M` : q.v >= 1e3 ? `${(q.v/1e3).toFixed(0)}K` : `${q.v}`;
-          cells[16].textContent = vol;
+          cells[17].textContent = vol;
         }
       }
 
@@ -678,18 +679,18 @@ async function fetchWatchlistData(tickers, tbodyId) {
               // Ex-dividend date
               const exDivIdx = d[0].exDividendDate;
               if (exDivIdx !== undefined && d[exDivIdx]) {
-                cells[9].textContent = d[exDivIdx];
+                cells[10].textContent = d[exDivIdx];
                 // Highlight if ex-div within 7 days
                 const exDate = new Date(d[exDivIdx]);
                 if (!isNaN(exDate)) {
                   const daysUntil = Math.ceil((exDate - new Date()) / (1000*60*60*24));
-                  if (daysUntil >= 0 && daysUntil <= 7) cells[9].innerHTML = `<span class="highlight-soon">${d[exDivIdx]}</span>`;
+                  if (daysUntil >= 0 && daysUntil <= 7) cells[10].innerHTML = `<span class="highlight-soon">${d[exDivIdx]}</span>`;
                 }
               }
               // Earnings date
               const edIdx = d[0].earningsDate;
               if (edIdx !== undefined && d[edIdx]) {
-                cells[10].textContent = d[edIdx];
+                cells[11].textContent = d[edIdx];
               }
             }
           }
@@ -713,9 +714,9 @@ async function fetchWatchlistData(tickers, tbodyId) {
                 const row = tbody.children[i];
                 if (row) {
                   const cells = row.cells;
-                  cells[13].textContent = `$${Math.round(low)}`;
-                  cells[14].textContent = `$${Math.round(median)}`;
-                  cells[15].textContent = `$${Math.round(high)}`;
+                  cells[14].textContent = `$${Math.round(low)}`;
+                  cells[15].textContent = `$${Math.round(median)}`;
+                  cells[16].textContent = `$${Math.round(high)}`;
                 }
               }
             }
@@ -723,7 +724,7 @@ async function fetchWatchlistData(tickers, tbodyId) {
         }
       } catch(e) { /* StockAnalysis forecast failed, skip */ }
 
-      // Basic metrics (Beta, P/E, P/B, Div, 52W)
+      // Basic metrics (Beta, P/E, P/B, PEG, Div, 52W)
       const metRes = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FINNHUB_KEY}`);
       const met = await metRes.json();
       if (met.metric) {
@@ -734,9 +735,10 @@ async function fetchWatchlistData(tickers, tbodyId) {
         cells[4].textContent = m.beta?.toFixed(2) || '—';
         cells[5].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
         cells[7].textContent = m.pbAnnual?.toFixed(2) || '—';
-        cells[8].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
-        cells[11].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
-        cells[12].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
+        cells[8].textContent = m.forwardPEG?.toFixed(2) || '—';
+        cells[9].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
+        cells[12].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
+        cells[13].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
       }
 
       // Historical P/E (5Y median from Macrotrends)
