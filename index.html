@@ -614,7 +614,8 @@ function renderWatchlist(container, category, title) {
       <div class="panel-header">
         <h3>${title} (${tickers.length} tickers)</h3>
       </div>
-      <div class="panel-body" style="padding:0; overflow-x:auto;">
+      <div class="panel-body" style="padding:0;">
+        <div style="overflow-x:auto; max-height:calc(100vh - 120px); overflow-y:auto;">
         <table class="data-table">
           <thead>
             <tr>
@@ -651,6 +652,7 @@ function renderWatchlist(container, category, title) {
             `).join('')}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   `;
