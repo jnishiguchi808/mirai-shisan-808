@@ -526,18 +526,32 @@ async function fetchStockData(ticker) {
       }
     }
 
-    // Price target (analyst Lo/Mid/Hi)
-    const targetRes = await fetch(`https://finnhub.io/api/v1/stock/price-target?symbol=${ticker}&token=${FINNHUB_KEY}`);
-    const target = await targetRes.json();
-    if (target.targetHigh) {
-      document.getElementById('analyst-lo').textContent = `Lo: $${target.targetLow?.toFixed(0) || '—'}`;
-      document.getElementById('analyst-mid').textContent = `Mid: $${target.targetMedian?.toFixed(0) || '—'}`;
-      document.getElementById('analyst-hi').textContent = `Hi: $${target.targetHigh?.toFixed(0) || '—'}`;
-      if (quote.c && target.targetLow && target.targetHigh) {
-        const pos = ((quote.c - target.targetLow) / (target.targetHigh - target.targetLow)) * 100;
-        document.getElementById('analyst-current').style.left = `${Math.min(100,Math.max(0,pos))}%`;
+    // Price target (analyst Lo/Mid/Hi) from StockAnalysis
+    try {
+      const saRes = await fetch(`https://corsproxy.io/?https://stockanalysis.com/stocks/${ticker.toLowerCase()}/forecast/__data.json`);
+      if (saRes.ok) {
+        const saData = await saRes.json();
+        const d = saData.nodes?.[2]?.data;
+        if (d) {
+          const ptIdx = d[0]?.priceTargets;
+          if (ptIdx !== undefined && d[ptIdx]) {
+            const pt = d[ptIdx];
+            const low = d[pt.low];
+            const median = d[pt.median] || d[pt.average];
+            const high = d[pt.high];
+            if (low && high) {
+              document.getElementById('analyst-lo').textContent = `Lo: $${Math.round(low)}`;
+              document.getElementById('analyst-mid').textContent = `Mid: $${Math.round(median)}`;
+              document.getElementById('analyst-hi').textContent = `Hi: $${Math.round(high)}`;
+              if (quote.c) {
+                const pos = ((quote.c - low) / (high - low)) * 100;
+                document.getElementById('analyst-current').style.left = `${Math.min(100,Math.max(0,pos))}%`;
+              }
+            }
+          }
+        }
       }
-    }
+    } catch(e) { /* StockAnalysis unavailable */ }
 
     // Earnings date
     const now = new Date();
@@ -585,6 +599,7 @@ function renderWatchlist(container, category, title) {
               <th>Chg %</th>
               <th>P/E</th>
               <th>P/B</th>
+              <th>Beta</th>
               <th>Div %</th>
               <th>Ex-Div</th>
               <th>Earnings</th>
@@ -601,7 +616,7 @@ function renderWatchlist(container, category, title) {
             ${tickers.map(t => `
               <tr>
                 <td class="ticker-cell" onclick="loadStockView('${t}')">${t}</td>
-                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
                 <td><a href="https://stockanalysis.com/stocks/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
               </tr>
             `).join('')}
@@ -640,23 +655,39 @@ async function fetchWatchlistData(tickers, tbodyId) {
         // Volume from quote
         if (q.v) {
           const vol = q.v >= 1e6 ? `${(q.v/1e6).toFixed(1)}M` : q.v >= 1e3 ? `${(q.v/1e3).toFixed(0)}K` : `${q.v}`;
-          cells[14].textContent = vol;
+          cells[15].textContent = vol;
         }
       }
 
-      // Price target (analyst)
-      const targetRes = await fetch(`https://finnhub.io/api/v1/stock/price-target?symbol=${ticker}&token=${FINNHUB_KEY}`);
-      const target = await targetRes.json();
-      if (target.targetLow) {
-        const row = tbody.children[i];
-        if (!row) continue;
-        const cells = row.cells;
-        cells[11].textContent = `$${target.targetLow.toFixed(0)}`;
-        cells[12].textContent = `$${target.targetMedian.toFixed(0)}`;
-        cells[13].textContent = `$${target.targetHigh.toFixed(0)}`;
-      }
+      // Price target from StockAnalysis (via CORS proxy)
+      try {
+        const saRes = await fetch(`https://corsproxy.io/?https://stockanalysis.com/stocks/${ticker.toLowerCase()}/forecast/__data.json`);
+        if (saRes.ok) {
+          const saData = await saRes.json();
+          const d = saData.nodes?.[2]?.data;
+          if (d) {
+            // Find priceTargets object (has avg, median, low, high keys with index refs)
+            const ptIdx = d[0]?.priceTargets;
+            if (ptIdx !== undefined && d[ptIdx]) {
+              const pt = d[ptIdx];
+              const low = d[pt.low];
+              const median = d[pt.median] || d[pt.average];
+              const high = d[pt.high];
+              if (low && high) {
+                const row = tbody.children[i];
+                if (row) {
+                  const cells = row.cells;
+                  cells[12].textContent = `$${Math.round(low)}`;
+                  cells[13].textContent = `$${Math.round(median)}`;
+                  cells[14].textContent = `$${Math.round(high)}`;
+                }
+              }
+            }
+          }
+        }
+      } catch(e) { /* StockAnalysis fetch failed, skip */ }
 
-      // Basic metrics (P/E, P/B, Div, 52W, Ex-Div)
+      // Basic metrics (P/E, P/B, Beta, Div, 52W, Ex-Div)
       const metRes = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FINNHUB_KEY}`);
       const met = await metRes.json();
       if (met.metric) {
@@ -666,20 +697,21 @@ async function fetchWatchlistData(tickers, tbodyId) {
         const m = met.metric;
         cells[4].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
         cells[5].textContent = m.pbAnnual?.toFixed(2) || '—';
-        cells[6].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
-        cells[7].textContent = m.exDividendDate ? m.exDividendDate.replace(/-/g,'/') : '—';
-        cells[9].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
-        cells[10].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
+        cells[6].textContent = m.beta?.toFixed(2) || '—';
+        cells[7].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
+        cells[8].textContent = m.exDividendDate ? m.exDividendDate.replace(/-/g,'/') : '—';
+        cells[10].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
+        cells[11].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
         // Highlight if ex-div within 7 days
         if (m.exDividendDate) {
           const daysUntil = Math.ceil((new Date(m.exDividendDate) - new Date()) / (1000*60*60*24));
-          if (daysUntil >= 0 && daysUntil <= 7) cells[7].innerHTML = `<span class="highlight-soon">${m.exDividendDate.replace(/-/g,'/')}</span>`;
+          if (daysUntil >= 0 && daysUntil <= 7) cells[8].innerHTML = `<span class="highlight-soon">${m.exDividendDate.replace(/-/g,'/')}</span>`;
         }
       }
 
     } catch(e) { /* skip */ }
-    // Throttle: 3 calls per ticker, Finnhub free = 60/min → pause every ticker
-    await new Promise(r => setTimeout(r, 3100));
+    // Throttle: 2 Finnhub calls + 1 StockAnalysis per ticker. Finnhub free = 60/min → pause every ticker
+    await new Promise(r => setTimeout(r, 2200));
   }
 }
 
