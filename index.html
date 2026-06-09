@@ -597,10 +597,10 @@ function renderWatchlist(container, category, title) {
               <th>Price</th>
               <th>Chg $</th>
               <th>Chg %</th>
+              <th>Beta</th>
               <th>P/E</th>
               <th>5Y P/E</th>
               <th>P/B</th>
-              <th>Beta</th>
               <th>Div %</th>
               <th>Ex-Div</th>
               <th>Earnings</th>
@@ -618,7 +618,7 @@ function renderWatchlist(container, category, title) {
               <tr>
                 <td class="ticker-cell" onclick="loadStockView('${t}')">${t}</td>
                 <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
-                <td><a href="https://stockanalysis.com/stocks/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
+                <td><a href="https://stockanalysis.com/stocks/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://www.macrotrends.net/stocks/charts/${t}/x/stock-price-history" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">MT</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
               </tr>
             `).join('')}
           </tbody>
@@ -660,14 +660,49 @@ async function fetchWatchlistData(tickers, tbodyId) {
         }
       }
 
-      // Price target from StockAnalysis (via CORS proxy)
+      // StockAnalysis: company name, ex-div, earnings (main page)
+      try {
+        const saMainRes = await fetch(`https://corsproxy.io/?https://stockanalysis.com/stocks/${ticker.toLowerCase()}/__data.json`);
+        if (saMainRes.ok) {
+          const saMain = await saMainRes.json();
+          const d = saMain.nodes?.[2]?.data;
+          if (d && d[0]) {
+            const row = tbody.children[i];
+            if (row) {
+              const cells = row.cells;
+              // Company name tooltip
+              const nameIdx = d[0].name;
+              if (nameIdx !== undefined && d[nameIdx]) {
+                cells[0].title = d[nameIdx];
+              }
+              // Ex-dividend date
+              const exDivIdx = d[0].exDividendDate;
+              if (exDivIdx !== undefined && d[exDivIdx]) {
+                cells[9].textContent = d[exDivIdx];
+                // Highlight if ex-div within 7 days
+                const exDate = new Date(d[exDivIdx]);
+                if (!isNaN(exDate)) {
+                  const daysUntil = Math.ceil((exDate - new Date()) / (1000*60*60*24));
+                  if (daysUntil >= 0 && daysUntil <= 7) cells[9].innerHTML = `<span class="highlight-soon">${d[exDivIdx]}</span>`;
+                }
+              }
+              // Earnings date
+              const edIdx = d[0].earningsDate;
+              if (edIdx !== undefined && d[edIdx]) {
+                cells[10].textContent = d[edIdx];
+              }
+            }
+          }
+        }
+      } catch(e) { /* StockAnalysis main page failed, skip */ }
+
+      // Price target from StockAnalysis forecast page (via CORS proxy)
       try {
         const saRes = await fetch(`https://corsproxy.io/?https://stockanalysis.com/stocks/${ticker.toLowerCase()}/forecast/__data.json`);
         if (saRes.ok) {
           const saData = await saRes.json();
           const d = saData.nodes?.[2]?.data;
           if (d) {
-            // Find priceTargets object (has avg, median, low, high keys with index refs)
             const ptIdx = d[0]?.priceTargets;
             if (ptIdx !== undefined && d[ptIdx]) {
               const pt = d[ptIdx];
@@ -686,9 +721,9 @@ async function fetchWatchlistData(tickers, tbodyId) {
             }
           }
         }
-      } catch(e) { /* StockAnalysis fetch failed, skip */ }
+      } catch(e) { /* StockAnalysis forecast failed, skip */ }
 
-      // Basic metrics (P/E, P/B, Beta, Div, 52W, Ex-Div)
+      // Basic metrics (Beta, P/E, P/B, Div, 52W)
       const metRes = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FINNHUB_KEY}`);
       const met = await metRes.json();
       if (met.metric) {
@@ -696,18 +731,12 @@ async function fetchWatchlistData(tickers, tbodyId) {
         if (!row) continue;
         const cells = row.cells;
         const m = met.metric;
-        cells[4].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
-        cells[6].textContent = m.pbAnnual?.toFixed(2) || '—';
-        cells[7].textContent = m.beta?.toFixed(2) || '—';
+        cells[4].textContent = m.beta?.toFixed(2) || '—';
+        cells[5].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
+        cells[7].textContent = m.pbAnnual?.toFixed(2) || '—';
         cells[8].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
-        cells[9].textContent = m.exDividendDate ? m.exDividendDate.replace(/-/g,'/') : '—';
         cells[11].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
         cells[12].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
-        // Highlight if ex-div within 7 days
-        if (m.exDividendDate) {
-          const daysUntil = Math.ceil((new Date(m.exDividendDate) - new Date()) / (1000*60*60*24));
-          if (daysUntil >= 0 && daysUntil <= 7) cells[9].innerHTML = `<span class="highlight-soon">${m.exDividendDate.replace(/-/g,'/')}</span>`;
-        }
       }
 
       // Historical P/E (5Y median from Macrotrends)
@@ -733,15 +762,15 @@ async function fetchWatchlistData(tickers, tbodyId) {
               const row = tbody.children[i];
               if (row) {
                 const cells = row.cells;
-                const currentPE = parseFloat(cells[4].textContent);
+                const currentPE = parseFloat(cells[5].textContent);
                 const mtLink = `https://www.macrotrends.net/stocks/charts/${ticker}/x/pe-ratio`;
                 if (currentPE && currentPE > 0) {
                   const dev = ((currentPE - median5Y) / median5Y * 100).toFixed(0);
                   const color = dev > 0 ? 'var(--red)' : 'var(--green)';
                   const sign = dev > 0 ? '+' : '';
-                  cells[5].innerHTML = `<a href="${mtLink}" target="_blank" style="color:${color}; text-decoration:underline; text-decoration-style:dotted;">${median5Y.toFixed(1)} (${sign}${dev}%)</a>`;
+                  cells[6].innerHTML = `<a href="${mtLink}" target="_blank" style="color:${color}; text-decoration:none;">${median5Y.toFixed(1)} (${sign}${dev}%)</a>`;
                 } else {
-                  cells[5].innerHTML = `<a href="${mtLink}" target="_blank" style="color:var(--text-secondary); text-decoration:underline; text-decoration-style:dotted;">${median5Y.toFixed(1)}</a>`;
+                  cells[6].innerHTML = `<a href="${mtLink}" target="_blank" style="color:var(--text-secondary); text-decoration:none;">${median5Y.toFixed(1)}</a>`;
                 }
               }
             }
