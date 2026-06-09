@@ -182,6 +182,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="insurance" style="padding-left:28px;">Insurance</a>
     <a href="#" data-view="logistics" style="padding-left:28px;">Logistics</a>
     <a href="#" data-view="retail" style="padding-left:28px;">Retail</a>
+    <a href="#" data-view="reit" style="padding-left:28px;">REIT</a>
     <a href="#" data-view="semiconductors" style="padding-left:28px;">Semiconductors</a>
     <a href="#" data-view="staples" style="padding-left:28px;">Staples</a>
     <a href="#" data-view="watchlist" style="padding-left:28px;">Stocks</a>
@@ -236,6 +237,7 @@ const WATCHLIST = {
   defense: ['GD','AXON','TDG','LMT','RTX','NOC','LHX','HII','BA','KTOS','PLTR','ITA','PPA'],
   etf_sp500: ['SPY','VOO','BALI','SPYI','SPYM','ISPY','SPMO','XLG','GPIQ','CGDV'],
   etf_russell: ['VONE','VONG','VONV','VTWO'],
+  reit: ['O','PLD','AMT','VICI','DLR','CCI','IRM','ADC','KIM','CUBE','WPC','STAG','VTR','OHI','EPR','RHP','DOC','IIPR','GOOD','DX','NLY','AGNC','MPT','ARR','CHMI'],
   energy_old: ['PSX','GNRC','TTE','ECO','OKE','SLB','COP','HAL','FANG','HE','EPD','XOM','CVX','MLPA','VNOM','MLPI','PBA','DUK','ET','KMI','DVN','LNG','URA','URNM','PR','LB','AQN','OXY','SMR'],
   energy_new: ['FSLR','BWA','BLDP','NEE','HYLN','ENPH','GM','ICLN','AMT','LIT','VST','XIFR','BEP','FCEL','HMC','PLUG','NIU','CHPT','MVST','QS','BEPC','BLNK','NRDE','SPRU','EVGO','LCID'],
   etf_yieldmax: ['AMDY','SMCY','APLY','GOOY','YMAG','NVDY','OARK','ABNY','TSLY','ULTY','XOMO','XYZY','FBY','MRNY','PLTY','NFLY','PYPY','GDXY','YBIT','CONY'],
@@ -382,6 +384,7 @@ function loadView(view) {
     case 'etf-russell': renderWatchlist(main, 'etf_russell', 'ETF (Russell) Watchlist'); break;
     case 'semiconductors': renderWatchlist(main, 'semiconductors', 'Semiconductor Watchlist'); break;
     case 'retail': renderWatchlist(main, 'retail', 'Retail Watchlist'); break;
+    case 'reit': renderWatchlist(main, 'reit', 'REIT Watchlist'); break;
     case 'staples': renderWatchlist(main, 'staples', 'Staples Watchlist'); break;
     case 'travel': renderWatchlist(main, 'travel', 'Travel Watchlist'); break;
     case 'logistics': renderWatchlist(main, 'logistics', 'Logistics Watchlist'); break;
