@@ -168,6 +168,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="portfolio">Portfolio</a>
     <div class="section-label">Watchlists</div>
     <a href="#" data-view="bdc" style="padding-left:28px;">BDC</a>
+    <a href="#" data-view="cybersecurity" style="padding-left:28px;">Cybersecurity</a>
     <a href="#" data-view="defense" style="padding-left:28px;">Defense</a>
     <a href="#" data-view="etfs" style="padding-left:28px;">ETFs &amp; Funds</a>
     <a href="#" data-view="fidelity" style="padding-left:28px;">ETF (Fidelity)</a>
@@ -244,6 +245,7 @@ const WATCHLIST = {
   bdc: ['MAIN','GAIN','GLAD','HTGC','HRZN','ARCC','OBDC','BXSL','TSLX'],
   rawmaterials: ['STLD','NUE','B','CLF','FCX','BHP','SCCO','RIO','NGLOY','SQM','LIT','COPX','ALB','GLD','IAU','GDX','URA','URNM','SLV','LAC'],
   medical: ['UNH','CVS','ARKG','JNJ','ABBV','SNY','GH','LGND','MRK','TMO','VCEL','BSX','TAK','GILD','HIMS','ABT','BMY','OPRX','PFE','FLGT','GDRX','TMDX','MRNA','ISRG','LLY','DXCM'],
+  cybersecurity: ['PANW','OKTA','TENB','CRWD','NET','PLTR','ZS','FTNT'],
   energy_old: ['PSX','GNRC','TTE','ECO','OKE','SLB','COP','HAL','FANG','HE','EPD','XOM','CVX','MLPA','VNOM','MLPI','PBA','DUK','ET','KMI','DVN','LNG','URA','URNM','PR','LB','AQN','OXY','SMR'],
   energy_new: ['FSLR','BWA','BLDP','NEE','HYLN','ENPH','GM','ICLN','AMT','LIT','VST','XIFR','BEP','FCEL','HMC','PLUG','NIU','CHPT','MVST','QS','BEPC','BLNK','NRDE','SPRU','EVGO','LCID'],
   etf_yieldmax: ['AMDY','SMCY','APLY','GOOY','YMAG','NVDY','OARK','ABNY','TSLY','ULTY','XOMO','XYZY','FBY','MRNY','PLTY','NFLY','PYPY','GDXY','YBIT','CONY'],
@@ -400,6 +402,7 @@ function loadView(view) {
     case 'ev': renderWatchlist(main, 'ev', 'EV Watchlist'); break;
     case 'defense': renderWatchlist(main, 'defense', 'Defense Watchlist'); break;
     case 'bdc': renderWatchlist(main, 'bdc', 'BDC Watchlist'); break;
+    case 'cybersecurity': renderWatchlist(main, 'cybersecurity', 'Cybersecurity Watchlist'); break;
     case 'energy-old': renderWatchlist(main, 'energy_old', 'Energy (Old) Watchlist'); break;
     case 'energy-new': renderWatchlist(main, 'energy_new', 'Energy (New) Watchlist'); break;
     case 'gambling': renderWatchlist(main, 'gambling', 'Gambling Watchlist'); break;
