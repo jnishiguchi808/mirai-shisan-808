@@ -1483,6 +1483,44 @@ function renderFairValuePrimer(container) {
 
         <p style="font-size:0.8rem; color:var(--text-secondary);"><strong>Tooltip shows:</strong> Hover over the FV cell to see Book Value per share, P/B ratio, and % gap vs current price.</p>
 
+        <!-- ETF EXCEPTION -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">📦 Special Case: ETFs & Mutual Funds (FV = "—")</h4>
+        <p>ETFs and mutual funds show <strong>"—"</strong> in the FV column. This is intentional — Fair Value estimation does not apply to funds for fundamentally different reasons than BDCs/REITs:</p>
+
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:16px; margin:12px 0;">
+          <ul style="margin:0; padding-left:20px; font-size:0.8rem;">
+            <li><strong>ETFs are baskets, not businesses.</strong> A stock has earnings, cash flow, and growth — things you can model. An ETF is just a wrapper around other stocks. There's no "intrinsic value" to discover.</li>
+            <li><strong>ETFs already trade at fair value.</strong> Unlike stocks (which can be mispriced for months), ETFs have an arbitrage mechanism: Authorized Participants (APs) create/redeem shares to keep the market price within pennies of the Net Asset Value (NAV). You can't buy an ETF "cheap."</li>
+            <li><strong>No meaningful EPS or book value.</strong> Finnhub may return EPS or book value for some ETFs, but these are aggregated numbers from the underlying holdings — plugging them into DCF/Graham models produces nonsensical results.</li>
+            <li><strong>The right question for ETFs is different.</strong> Instead of "is this undervalued?", the questions are: What's the expense ratio? What's the yield? How does it compare to peers? What's the sector exposure? These are composition questions, not valuation questions.</li>
+          </ul>
+        </div>
+
+        <table style="width:100%; border-collapse:collapse; margin:12px 0; font-size:0.8rem;">
+          <tr style="background:var(--bg-secondary); border-bottom:1px solid var(--border);">
+            <th style="padding:8px; text-align:left;">Asset Type</th>
+            <th style="padding:8px; text-align:left;">FV Method</th>
+            <th style="padding:8px; text-align:left;">Why</th>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px;">Stocks</td>
+            <td style="padding:8px;">DCF + Graham + PEG blend</td>
+            <td style="padding:8px;">Has earnings, growth, and can be mispriced</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px;">REITs & BDCs</td>
+            <td style="padding:8px;">Book Value (NAV)</td>
+            <td style="padding:8px;">Pass-through entities; trade relative to net asset value</td>
+          </tr>
+          <tr>
+            <td style="padding:8px;">ETFs & Mutual Funds</td>
+            <td style="padding:8px;">— (not applicable)</td>
+            <td style="padding:8px;">Arbitrage keeps price = NAV; no intrinsic value to model</td>
+          </tr>
+        </table>
+
+        <p style="font-size:0.8rem; color:var(--text-secondary);"><strong>Note:</strong> Most ETFs naturally show "—" because Finnhub doesn't return EPS data for them. In rare cases where it does, the result would be meaningless anyway — so the "—" is the correct display regardless.</p>
+
         <!-- LIMITATIONS -->
         <h4 style="color:var(--red); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">⚠️ Limitations & Caveats</h4>
         <ul style="margin:8px 0 8px 20px;">
