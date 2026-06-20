@@ -691,278 +691,328 @@ function renderWatchlist(container, category, title) {
   fetchWatchlistData(tickers, 'watchlist-body');
 }
 
+// --- Cache utilities (localStorage, 15-min TTL) ---
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+function cacheGet(key) {
+  try {
+    const raw = localStorage.getItem('ms808_' + key);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) { localStorage.removeItem('ms808_' + key); return null; }
+    return data;
+  } catch(e) { return null; }
+}
+function cacheSet(key, data) {
+  try { localStorage.setItem('ms808_' + key, JSON.stringify({ data, ts: Date.now() })); } catch(e) {}
+}
+
+// --- Parallel fetch with concurrency limiter ---
+async function parallelLimit(tasks, limit) {
+  const results = [];
+  let idx = 0;
+  async function worker() {
+    while (idx < tasks.length) {
+      const i = idx++;
+      results[i] = await tasks[i]();
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, () => worker()));
+  return results;
+}
+
 async function fetchWatchlistData(tickers, tbodyId) {
   const tbody = document.getElementById(tbodyId);
   if (!tbody) return;
 
-  for (let i = 0; i < tickers.length; i++) {
-    const ticker = tickers[i];
-    try {
-      // Quote
-      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`);
-      const q = await res.json();
-      if (q.c) {
-        const row = tbody.children[i];
-        if (!row) continue;
-        const cells = row.cells;
-        const change = (q.c - q.pc).toFixed(2);
-        const pct = ((q.c - q.pc) / q.pc * 100).toFixed(2);
-        const isUp = parseFloat(change) >= 0;
-        cells[2].textContent = `$${q.c.toFixed(2)}`;
-        cells[3].textContent = `${isUp?'+':''}${change}`;
-        cells[3].className = isUp ? 'up' : 'down';
-        cells[4].textContent = `${isUp?'+':''}${pct}%`;
-        cells[4].className = isUp ? 'up' : 'down';
-        // Volume from quote
-        if (q.v) {
-          const vol = q.v >= 1e6 ? `${(q.v/1e6).toFixed(1)}M` : q.v >= 1e3 ? `${(q.v/1e3).toFixed(0)}K` : `${q.v}`;
-          cells[20].textContent = vol;
+  // Build per-ticker fetch tasks
+  const tasks = tickers.map((ticker, i) => () => fetchSingleTicker(ticker, i, tbody));
+  // Run 5 tickers in parallel (stays under Finnhub 60/min with 2 calls per ticker)
+  await parallelLimit(tasks, 5);
+}
+
+async function fetchSingleTicker(ticker, i, tbody) {
+  try {
+    const cached = cacheGet(ticker);
+    if (cached) { applyTickerData(cached, i, tbody, ticker); return; }
+
+    const tickerData = {};
+
+    // Quote (Finnhub)
+    const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`);
+    const q = await res.json();
+    tickerData.quote = q;
+
+    // Basic metrics (Finnhub) — slight delay to respect rate limit
+    await new Promise(r => setTimeout(r, 600));
+    const metRes = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FINNHUB_KEY}`);
+    const met = await metRes.json();
+    tickerData.metric = met.metric || null;
+
+    // Non-Finnhub fetches can run in parallel
+    const [saMain, saForecast, mtData, yfData] = await Promise.all([
+      fetchSAMain(ticker),
+      fetchSAForecast(ticker),
+      fetchMacrotrends(ticker),
+      fetchYahooSignal(ticker)
+    ]);
+    tickerData.saMain = saMain;
+    tickerData.saForecast = saForecast;
+    tickerData.macrotrends = mtData;
+    tickerData.yahoo = yfData;
+
+    // Cache the result
+    cacheSet(ticker, tickerData);
+    // Apply to DOM
+    applyTickerData(tickerData, i, tbody, ticker);
+  } catch(e) { /* skip failed ticker */ }
+}
+
+async function fetchSAMain(ticker) {
+  try {
+    const r = await fetch(`https://corsproxy.io/?https://stockanalysis.com/stocks/${ticker.toLowerCase()}/__data.json`);
+    if (r.ok) return await r.json();
+  } catch(e) {}
+  return null;
+}
+
+async function fetchSAForecast(ticker) {
+  try {
+    const r = await fetch(`https://corsproxy.io/?https://stockanalysis.com/stocks/${ticker.toLowerCase()}/forecast/__data.json`);
+    if (r.ok) return await r.json();
+  } catch(e) {}
+  return null;
+}
+
+async function fetchMacrotrends(ticker) {
+  try {
+    const mtUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.macrotrends.net/stocks/charts/${ticker}/x/pe-ratio`)}`;
+    const r = await fetch(mtUrl);
+    if (r.ok) {
+      const html = await r.text();
+      const peMatches = [...html.matchAll(/<td[^>]*>(\d{4}-\d{2}-\d{2})<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/g)];
+      if (peMatches.length > 0) {
+        const fiveYearsAgo = new Date();
+        fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+        const recentPEs = peMatches
+          .filter(m => new Date(m[1]) >= fiveYearsAgo)
+          .map(m => parseFloat(m[2]))
+          .filter(v => v > 0 && v < 1000);
+        if (recentPEs.length >= 4) {
+          recentPEs.sort((a, b) => a - b);
+          const mid = Math.floor(recentPEs.length / 2);
+          const median5Y = recentPEs.length % 2 === 0
+            ? (recentPEs[mid - 1] + recentPEs[mid]) / 2
+            : recentPEs[mid];
+          return { median5Y };
         }
       }
+    }
+  } catch(e) {}
+  return null;
+}
 
-      // StockAnalysis: company name, ex-div, earnings (main page)
-      try {
-        const saMainRes = await fetch(`https://corsproxy.io/?https://stockanalysis.com/stocks/${ticker.toLowerCase()}/__data.json`);
-        if (saMainRes.ok) {
-          const saMain = await saMainRes.json();
-          const d = saMain.nodes?.[2]?.data;
-          if (d && d[0]) {
-            const row = tbody.children[i];
-            if (row) {
-              const cells = row.cells;
-              // Company name tooltip
-              const nameIdx = d[0].name;
-              if (nameIdx !== undefined && d[nameIdx]) {
-                cells[0].title = d[nameIdx];
-              }
-              // Ex-dividend date
-              const exDivIdx = d[0].exDividendDate;
-              if (exDivIdx !== undefined && d[exDivIdx]) {
-                const exDate = new Date(d[exDivIdx]);
-                const exFmt = !isNaN(exDate) ? `${(exDate.getMonth()+1).toString().padStart(2,'0')}/${exDate.getDate().toString().padStart(2,'0')}/${exDate.getFullYear().toString().slice(-2)}` : d[exDivIdx];
-                cells[12].textContent = exFmt;
-                // Highlight if ex-div within 7 days
-                if (!isNaN(exDate)) {
-                  const daysUntil = Math.ceil((exDate - new Date()) / (1000*60*60*24));
-                  if (daysUntil >= 0 && daysUntil <= 7) cells[12].innerHTML = `<span class="highlight-soon">${exFmt}</span>`;
-                }
-              }
-              // Earnings date
-              const edIdx = d[0].earningsDate;
-              if (edIdx !== undefined && d[edIdx]) {
-                const edDate = new Date(d[edIdx]);
-                cells[13].textContent = !isNaN(edDate) ? `${(edDate.getMonth()+1).toString().padStart(2,'0')}/${edDate.getDate().toString().padStart(2,'0')}/${edDate.getFullYear().toString().slice(-2)}` : d[edIdx];
-              }
-            }
-          }
+async function fetchYahooSignal(ticker) {
+  try {
+    const yfUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`)}`;
+    const r = await fetch(yfUrl);
+    if (r.ok) {
+      const yfData = await r.json();
+      const closes = yfData.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v => v != null);
+      if (closes && closes.length >= 200) {
+        const ma50 = closes.slice(-50).reduce((a, b) => a + b, 0) / 50;
+        const ma200 = closes.slice(-200).reduce((a, b) => a + b, 0) / 200;
+        const price = closes[closes.length - 1];
+        const period = 14;
+        const recent = closes.slice(-(period + 1));
+        let gains = 0, losses = 0;
+        for (let j = 1; j < recent.length; j++) {
+          const diff = recent[j] - recent[j - 1];
+          if (diff > 0) gains += diff; else losses -= diff;
         }
-      } catch(e) { /* StockAnalysis main page failed, skip */ }
+        const avgGain = gains / period;
+        const avgLoss = losses / period;
+        const rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+        return { price, ma50, ma200, rsi };
+      }
+    }
+  } catch(e) {}
+  return null;
+}
 
-      // Price target from StockAnalysis forecast page (via CORS proxy)
-      try {
-        const saRes = await fetch(`https://corsproxy.io/?https://stockanalysis.com/stocks/${ticker.toLowerCase()}/forecast/__data.json`);
-        if (saRes.ok) {
-          const saData = await saRes.json();
-          const d = saData.nodes?.[2]?.data;
-          if (d) {
-            const ptIdx = d[0]?.priceTargets;
-            if (ptIdx !== undefined && d[ptIdx]) {
-              const pt = d[ptIdx];
-              const low = d[pt.low];
-              const median = d[pt.median] || d[pt.average];
-              const high = d[pt.high];
-              if (low && high) {
-                const row = tbody.children[i];
-                if (row) {
-                  const cells = row.cells;
-                  cells[17].textContent = `$${Math.round(low)}`;
-                  cells[18].textContent = `$${Math.round(median)}`;
-                  cells[19].textContent = `$${Math.round(high)}`;
-                }
-              }
-            }
-          }
-        }
-      } catch(e) { /* StockAnalysis forecast failed, skip */ }
+function applyTickerData(data, i, tbody, ticker) {
+  const row = tbody.children[i];
+  if (!row) return;
+  const cells = row.cells;
 
-      // Basic metrics (Beta, P/E, P/B, PEG, Div, 52W)
-      const metRes = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FINNHUB_KEY}`);
-      const met = await metRes.json();
-      if (met.metric) {
-        const row = tbody.children[i];
-        if (!row) continue;
-        const cells = row.cells;
-        const m = met.metric;
-        cells[5].textContent = m.beta?.toFixed(2) || '—';
-        cells[6].textContent = m.pbAnnual?.toFixed(2) || '—';
-        cells[7].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
-        // PEG with color-coding and growth tooltip
-        const peg = m.forwardPEG || m.pegTTM;
-        const growth = m.epsGrowthTTMYoy;
-        if (peg && peg > 0) {
-          let pegColor = 'var(--text-primary)';
-          let pegWarning = '';
-          if (peg < 0.5 && growth && Math.abs(growth) > 100) {
-            pegColor = 'var(--yellow)';
-            pegWarning = '⚠️ ';
-          } else if (peg < 1.0) {
-            pegColor = 'var(--green)';
-          } else if (peg > 2.0) {
-            pegColor = 'var(--red)';
-          }
-          const growthStr = growth ? `${growth > 0 ? '+' : ''}${growth.toFixed(0)}% EPS growth YoY` : 'Growth data unavailable';
-          const tipText = peg < 0.5 && growth > 100 ? `${pegWarning}${growthStr} (cyclical?)` : growthStr;
-          cells[9].innerHTML = `<span style="color:${pegColor}" title="${tipText}">${peg.toFixed(2)}</span>`;
-        } else {
-          cells[9].textContent = '—';
-        }
-        cells[10].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
-        // Payout Ratio (FCF-based: DPS / CashFlowPerShare)
-        const dps = m.dividendPerShareAnnual;
-        const cfps = m.cashFlowPerShareTTM;
-        if (dps && cfps && cfps > 0) {
-          const payout = (dps / cfps) * 100;
-          let payColor = 'var(--green)';
-          if (payout > 90) payColor = 'var(--red)';
-          else if (payout > 75) payColor = 'var(--yellow)';
-          const epsPayout = m.payoutRatioTTM ? `EPS Payout: ${m.payoutRatioTTM.toFixed(0)}%` : '';
-          const tipText = `FCF Payout: ${payout.toFixed(0)}% (DPS: $${dps.toFixed(2)} / CFPS: $${cfps.toFixed(2)})${epsPayout ? ' | ' + epsPayout : ''}`;
-          cells[11].innerHTML = `<span style="color:${payColor}" title="${tipText}">${payout.toFixed(0)}%</span>`;
-        } else if (dps && dps > 0) {
-          cells[11].innerHTML = `<span style="color:var(--red)" title="No cash flow data available">n/a</span>`;
-        } else {
-          cells[11].textContent = '—';
-        }
-        cells[14].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
-        cells[15].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
+  // Quote data
+  const q = data.quote;
+  if (q && q.c) {
+    const change = (q.c - q.pc).toFixed(2);
+    const pct = ((q.c - q.pc) / q.pc * 100).toFixed(2);
+    const isUp = parseFloat(change) >= 0;
+    cells[2].textContent = `$${q.c.toFixed(2)}`;
+    cells[3].textContent = `${isUp?'+':''}${change}`;
+    cells[3].className = isUp ? 'up' : 'down';
+    cells[4].textContent = `${isUp?'+':''}${pct}%`;
+    cells[4].className = isUp ? 'up' : 'down';
+    if (q.v) {
+      const vol = q.v >= 1e6 ? `${(q.v/1e6).toFixed(1)}M` : q.v >= 1e3 ? `${(q.v/1e3).toFixed(0)}K` : `${q.v}`;
+      cells[20].textContent = vol;
+    }
+  }
 
-        // Fair Value (FV) — multi-model blended estimate
-        const eps = m.epsNormalizedAnnual;
-        const epsGrowth = m.epsGrowthTTMYoy;
-        const bookVal = m.bookValuePerShareAnnual;
-        const currentPrice = parseFloat(cells[2].textContent.replace('$',''));
-        if (eps && eps > 0) {
-          let models = [];
-          let tips = [];
-          // Model 1: DCF-Lite (2-stage: TTM growth for 5yr, 3% terminal, 10% discount)
-          const g = epsGrowth ? Math.min(Math.max(epsGrowth / 100, -0.2), 0.5) : 0.08;
-          let dcfSum = 0;
-          for (let yr = 1; yr <= 5; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1.10, yr);
-          const terminalEPS = eps * Math.pow(1 + g, 5) * (1 + 0.03);
-          const terminalVal = terminalEPS / (0.10 - 0.03);
-          const pvTerminal = terminalVal / Math.pow(1.10, 5);
-          const dcfFV = dcfSum + pvTerminal;
-          if (dcfFV > 0 && dcfFV < currentPrice * 10) { models.push(dcfFV); tips.push(`DCF: $${dcfFV.toFixed(0)}`); }
-          // Model 2: Graham Number
-          if (bookVal && bookVal > 0) {
-            const graham = Math.sqrt(22.5 * eps * bookVal);
-            if (graham > 0) { models.push(graham); tips.push(`Graham: $${graham.toFixed(0)}`); }
-          }
-          // Model 3: PEG Fair Value (fair P/E = growth rate)
-          if (epsGrowth && epsGrowth > 0) {
-            const fairPE = Math.min(epsGrowth, 40);
-            const pegFV = fairPE * eps;
-            if (pegFV > 0) { models.push(pegFV); tips.push(`PEG: $${pegFV.toFixed(0)}`); }
-          }
-          // Blended average
-          if (models.length > 0) {
-            const blended = models.reduce((a, b) => a + b, 0) / models.length;
-            const gap = ((blended - currentPrice) / currentPrice * 100).toFixed(0);
-            const fvColor = blended > currentPrice * 1.1 ? 'var(--green)' : blended < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
-            const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%)`;
-            cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
-          }
+  // StockAnalysis main (name, ex-div, earnings)
+  if (data.saMain) {
+    const d = data.saMain.nodes?.[2]?.data;
+    if (d && d[0]) {
+      const nameIdx = d[0].name;
+      if (nameIdx !== undefined && d[nameIdx]) cells[0].title = d[nameIdx];
+      const exDivIdx = d[0].exDividendDate;
+      if (exDivIdx !== undefined && d[exDivIdx]) {
+        const exDate = new Date(d[exDivIdx]);
+        const exFmt = !isNaN(exDate) ? `${(exDate.getMonth()+1).toString().padStart(2,'0')}/${exDate.getDate().toString().padStart(2,'0')}/${exDate.getFullYear().toString().slice(-2)}` : d[exDivIdx];
+        cells[12].textContent = exFmt;
+        if (!isNaN(exDate)) {
+          const daysUntil = Math.ceil((exDate - new Date()) / (1000*60*60*24));
+          if (daysUntil >= 0 && daysUntil <= 7) cells[12].innerHTML = `<span class="highlight-soon">${exFmt}</span>`;
         }
       }
+      const edIdx = d[0].earningsDate;
+      if (edIdx !== undefined && d[edIdx]) {
+        const edDate = new Date(d[edIdx]);
+        cells[13].textContent = !isNaN(edDate) ? `${(edDate.getMonth()+1).toString().padStart(2,'0')}/${edDate.getDate().toString().padStart(2,'0')}/${edDate.getFullYear().toString().slice(-2)}` : d[edIdx];
+      }
+    }
+  }
 
-      // Historical P/E (5Y median from Macrotrends)
-      try {
-        const mtUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.macrotrends.net/stocks/charts/${ticker}/x/pe-ratio`)}`;
-        const mtRes = await fetch(mtUrl);
-        if (mtRes.ok) {
-          const html = await mtRes.text();
-          const peMatches = [...html.matchAll(/<td[^>]*>(\d{4}-\d{2}-\d{2})<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/g)];
-          if (peMatches.length > 0) {
-            const fiveYearsAgo = new Date();
-            fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
-            const recentPEs = peMatches
-              .filter(m => new Date(m[1]) >= fiveYearsAgo)
-              .map(m => parseFloat(m[2]))
-              .filter(v => v > 0 && v < 1000);
-            if (recentPEs.length >= 4) {
-              recentPEs.sort((a, b) => a - b);
-              const mid = Math.floor(recentPEs.length / 2);
-              const median5Y = recentPEs.length % 2 === 0
-                ? (recentPEs[mid - 1] + recentPEs[mid]) / 2
-                : recentPEs[mid];
-              const row = tbody.children[i];
-              if (row) {
-                const cells = row.cells;
-                const currentPE = parseFloat(cells[7].textContent);
-                const mtLink = `https://www.macrotrends.net/stocks/charts/${ticker}/x/pe-ratio`;
-                if (currentPE && currentPE > 0) {
-                  const dev = ((currentPE - median5Y) / median5Y * 100).toFixed(0);
-                  const color = dev > 0 ? 'var(--red)' : 'var(--green)';
-                  const sign = dev > 0 ? '+' : '';
-                  cells[8].innerHTML = `<a href="${mtLink}" target="_blank" style="color:${color}; text-decoration:none;">${median5Y.toFixed(1)} (${sign}${dev}%)</a>`;
-                } else {
-                  cells[8].innerHTML = `<a href="${mtLink}" target="_blank" style="color:var(--text-secondary); text-decoration:none;">${median5Y.toFixed(1)}</a>`;
-                }
-              }
-            }
-          }
+  // StockAnalysis forecast (analyst targets)
+  if (data.saForecast) {
+    const d = data.saForecast.nodes?.[2]?.data;
+    if (d) {
+      const ptIdx = d[0]?.priceTargets;
+      if (ptIdx !== undefined && d[ptIdx]) {
+        const pt = d[ptIdx];
+        const low = d[pt.low];
+        const median = d[pt.median] || d[pt.average];
+        const high = d[pt.high];
+        if (low && high) {
+          cells[17].textContent = `$${Math.round(low)}`;
+          cells[18].textContent = `$${Math.round(median)}`;
+          cells[19].textContent = `$${Math.round(high)}`;
         }
-      } catch(e) { /* Macrotrends fetch failed, skip */ }
+      }
+    }
+  }
 
-      // Technical Signal (50MA, 200MA, RSI from Yahoo Finance chart data)
-      try {
-        const yfUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`)}`;
-        const yfRes = await fetch(yfUrl);
-        if (yfRes.ok) {
-          const yfData = await yfRes.json();
-          const closes = yfData.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v => v != null);
-          if (closes && closes.length >= 200) {
-            // Calculate 50-day and 200-day MAs
-            const ma50 = closes.slice(-50).reduce((a, b) => a + b, 0) / 50;
-            const ma200 = closes.slice(-200).reduce((a, b) => a + b, 0) / 200;
-            const price = closes[closes.length - 1];
+  // Finnhub metrics
+  const m = data.metric;
+  if (m) {
+    cells[5].textContent = m.beta?.toFixed(2) || '—';
+    cells[6].textContent = m.pbAnnual?.toFixed(2) || '—';
+    cells[7].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
+    const peg = m.forwardPEG || m.pegTTM;
+    const growth = m.epsGrowthTTMYoy;
+    if (peg && peg > 0) {
+      let pegColor = 'var(--text-primary)';
+      let pegWarning = '';
+      if (peg < 0.5 && growth && Math.abs(growth) > 100) {
+        pegColor = 'var(--yellow)'; pegWarning = '⚠️ ';
+      } else if (peg < 1.0) {
+        pegColor = 'var(--green)';
+      } else if (peg > 2.0) {
+        pegColor = 'var(--red)';
+      }
+      const growthStr = growth ? `${growth > 0 ? '+' : ''}${growth.toFixed(0)}% EPS growth YoY` : 'Growth data unavailable';
+      const tipText = peg < 0.5 && growth > 100 ? `${pegWarning}${growthStr} (cyclical?)` : growthStr;
+      cells[9].innerHTML = `<span style="color:${pegColor}" title="${tipText}">${peg.toFixed(2)}</span>`;
+    } else {
+      cells[9].textContent = '—';
+    }
+    cells[10].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
+    // Payout Ratio (FCF-based)
+    const dps = m.dividendPerShareAnnual;
+    const cfps = m.cashFlowPerShareTTM;
+    if (dps && cfps && cfps > 0) {
+      const payout = (dps / cfps) * 100;
+      let payColor = 'var(--green)';
+      if (payout > 90) payColor = 'var(--red)';
+      else if (payout > 75) payColor = 'var(--yellow)';
+      const epsPayout = m.payoutRatioTTM ? `EPS Payout: ${m.payoutRatioTTM.toFixed(0)}%` : '';
+      const tipText = `FCF Payout: ${payout.toFixed(0)}% (DPS: $${dps.toFixed(2)} / CFPS: $${cfps.toFixed(2)})${epsPayout ? ' | ' + epsPayout : ''}`;
+      cells[11].innerHTML = `<span style="color:${payColor}" title="${tipText}">${payout.toFixed(0)}%</span>`;
+    } else if (dps && dps > 0) {
+      cells[11].innerHTML = `<span style="color:var(--red)" title="No cash flow data available">n/a</span>`;
+    } else {
+      cells[11].textContent = '—';
+    }
+    cells[14].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
+    cells[15].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
 
-            // Calculate RSI (14-day)
-            const period = 14;
-            const recent = closes.slice(-(period + 1));
-            let gains = 0, losses = 0;
-            for (let j = 1; j < recent.length; j++) {
-              const diff = recent[j] - recent[j - 1];
-              if (diff > 0) gains += diff; else losses -= diff;
-            }
-            const avgGain = gains / period;
-            const avgLoss = losses / period;
-            const rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+    // Fair Value (FV)
+    const eps = m.epsNormalizedAnnual;
+    const epsGrowth = m.epsGrowthTTMYoy;
+    const bookVal = m.bookValuePerShareAnnual;
+    const currentPrice = parseFloat(cells[2].textContent.replace('$',''));
+    if (eps && eps > 0) {
+      let models = [];
+      let tips = [];
+      const g = epsGrowth ? Math.min(Math.max(epsGrowth / 100, -0.2), 0.5) : 0.08;
+      let dcfSum = 0;
+      for (let yr = 1; yr <= 5; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1.10, yr);
+      const terminalEPS = eps * Math.pow(1 + g, 5) * (1 + 0.03);
+      const terminalVal = terminalEPS / (0.10 - 0.03);
+      const pvTerminal = terminalVal / Math.pow(1.10, 5);
+      const dcfFV = dcfSum + pvTerminal;
+      if (dcfFV > 0 && dcfFV < currentPrice * 10) { models.push(dcfFV); tips.push(`DCF: $${dcfFV.toFixed(0)}`); }
+      if (bookVal && bookVal > 0) {
+        const graham = Math.sqrt(22.5 * eps * bookVal);
+        if (graham > 0) { models.push(graham); tips.push(`Graham: $${graham.toFixed(0)}`); }
+      }
+      if (epsGrowth && epsGrowth > 0) {
+        const fairPE = Math.min(epsGrowth, 40);
+        const pegFV = fairPE * eps;
+        if (pegFV > 0) { models.push(pegFV); tips.push(`PEG: $${pegFV.toFixed(0)}`); }
+      }
+      if (models.length > 0) {
+        const blended = models.reduce((a, b) => a + b, 0) / models.length;
+        const gap = ((blended - currentPrice) / currentPrice * 100).toFixed(0);
+        const fvColor = blended > currentPrice * 1.1 ? 'var(--green)' : blended < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
+        const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%)`;
+        cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
+      }
+    }
+  }
 
-            // Determine signal
-            let signal = 'H', sigColor = 'var(--yellow)', sigTip = '';
-            if (price > ma50 && ma50 > ma200 && rsi < 70) {
-              signal = 'B'; sigColor = 'var(--green)';
-            } else if (price > ma200 && price <= ma50 * 1.02 && rsi < 40) {
-              signal = 'D'; sigColor = 'var(--blue)';
-            } else if (price < ma50 && ma50 < ma200) {
-              signal = 'S'; sigColor = 'var(--red)';
-            } else if (rsi > 80) {
-              signal = 'S'; sigColor = 'var(--red)';
-            }
-            sigTip = `Price: $${price.toFixed(0)} | 50MA: $${ma50.toFixed(0)} | 200MA: $${ma200.toFixed(0)} | RSI: ${rsi.toFixed(0)}`;
+  // 5Y P/E (Macrotrends)
+  if (data.macrotrends && data.macrotrends.median5Y) {
+    const median5Y = data.macrotrends.median5Y;
+    const currentPE = parseFloat(cells[7].textContent);
+    const mtLink = `https://www.macrotrends.net/stocks/charts/${ticker}/x/pe-ratio`;
+    if (currentPE && currentPE > 0) {
+      const dev = ((currentPE - median5Y) / median5Y * 100).toFixed(0);
+      const color = dev > 0 ? 'var(--red)' : 'var(--green)';
+      const sign = dev > 0 ? '+' : '';
+      cells[8].innerHTML = `<a href="${mtLink}" target="_blank" style="color:${color}; text-decoration:none;">${median5Y.toFixed(1)} (${sign}${dev}%)</a>`;
+    } else {
+      cells[8].innerHTML = `<a href="${mtLink}" target="_blank" style="color:var(--text-secondary); text-decoration:none;">${median5Y.toFixed(1)}</a>`;
+    }
+  }
 
-            const row = tbody.children[i];
-            if (row) {
-              row.cells[1].innerHTML = `<span style="color:${sigColor}; font-weight:700;" title="${sigTip}">${signal}</span>`;
-            }
-          }
-        }
-      } catch(e) { /* Yahoo chart fetch failed, skip */ }
-
-    } catch(e) { /* skip */ }
-    // Throttle: 2 Finnhub + 1 StockAnalysis + 1 Macrotrends per ticker
-    await new Promise(r => setTimeout(r, 2200));
+  // Technical Signal (Yahoo)
+  if (data.yahoo) {
+    const { price, ma50, ma200, rsi } = data.yahoo;
+    let signal = 'H', sigColor = 'var(--yellow)';
+    if (price > ma50 && ma50 > ma200 && rsi < 70) {
+      signal = 'B'; sigColor = 'var(--green)';
+    } else if (price > ma200 && price <= ma50 * 1.02 && rsi < 40) {
+      signal = 'D'; sigColor = 'var(--blue)';
+    } else if (price < ma50 && ma50 < ma200) {
+      signal = 'S'; sigColor = 'var(--red)';
+    } else if (rsi > 80) {
+      signal = 'S'; sigColor = 'var(--red)';
+    }
+    const sigTip = `Price: $${price.toFixed(0)} | 50MA: $${ma50.toFixed(0)} | 200MA: $${ma200.toFixed(0)} | RSI: ${rsi.toFixed(0)}`;
+    cells[1].innerHTML = `<span style="color:${sigColor}; font-weight:700;" title="${sigTip}">${signal}</span>`;
   }
 }
 
