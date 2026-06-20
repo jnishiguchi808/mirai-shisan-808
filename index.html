@@ -986,7 +986,20 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
     } else if (eps && eps > 0) {
       let models = [];
       let tips = [];
-      const g = epsGrowth ? Math.min(Math.max(epsGrowth / 100, -0.2), 0.5) : 0.08;
+      // Growth estimate: prefer forward-implied growth (P/E ÷ forwardPEG) over trailing TTM
+      const pe = m.peNormalizedAnnual;
+      const fwdPEG = m.forwardPEG;
+      let growthSource = 'TTM';
+      let growthPct;
+      if (fwdPEG && fwdPEG > 0 && pe && pe > 0) {
+        growthPct = pe / fwdPEG; // implied forward growth %
+        growthSource = 'Fwd';
+      } else if (epsGrowth) {
+        growthPct = epsGrowth;
+      } else {
+        growthPct = 8; // default assumption
+      }
+      const g = Math.min(Math.max(growthPct / 100, -0.2), 0.5);
       let dcfSum = 0;
       for (let yr = 1; yr <= 5; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1.10, yr);
       const terminalEPS = eps * Math.pow(1 + g, 5) * (1 + 0.03);
@@ -998,8 +1011,8 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
         const graham = Math.sqrt(22.5 * eps * bookVal);
         if (graham > 0) { models.push(graham); tips.push(`Graham: $${graham.toFixed(0)}`); }
       }
-      if (epsGrowth && epsGrowth > 0) {
-        const fairPE = Math.min(epsGrowth, 40);
+      if (growthPct > 0) {
+        const fairPE = Math.min(growthPct, 40);
         const pegFV = fairPE * eps;
         if (pegFV > 0) { models.push(pegFV); tips.push(`PEG: $${pegFV.toFixed(0)}`); }
       }
@@ -1007,7 +1020,7 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
         const blended = models.reduce((a, b) => a + b, 0) / models.length;
         const gap = ((blended - currentPrice) / currentPrice * 100).toFixed(0);
         const fvColor = blended > currentPrice * 1.1 ? 'var(--green)' : blended < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
-        const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%)`;
+        const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [Growth: ${growthPct.toFixed(1)}% ${growthSource}]`;
         cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
       }
     }
@@ -1423,7 +1436,7 @@ function renderFairValuePrimer(container) {
         <p>This is a simplified <strong>Discounted Cash Flow</strong> model — the same core methodology used by SimplyWallStreet, VectorVest, and professional equity analysts. Here's how it works:</p>
         <ol style="margin:12px 0 12px 20px;">
           <li><strong>Take current EPS</strong> (normalized, trailing 12 months)</li>
-          <li><strong>Grow it</strong> at the trailing EPS growth rate for 5 years (clamped between -20% and +50% to avoid absurd projections)</li>
+          <li><strong>Grow it</strong> at the <strong>forward-implied growth rate</strong> when available (derived from Forward PEG: growth = P/E ÷ Forward PEG), or fall back to trailing EPS growth. Clamped between -20% and +50% to avoid absurd projections.</li>
           <li><strong>Discount each year's earnings</strong> back at 10% (a standard equity risk premium)</li>
           <li><strong>Add a terminal value</strong>: after year 5, assume perpetual growth at 3% (roughly GDP/inflation). The terminal value = Year 5 EPS × (1.03) / (0.10 - 0.03), discounted back 5 years.</li>
           <li><strong>Sum it all up</strong> = the stock's intrinsic value per share</li>
@@ -1461,6 +1474,55 @@ function renderFairValuePrimer(container) {
           <p style="margin:8px 0 0; font-size:0.75rem; color:var(--text-dim);">Example: EPS=$5, growth=25% → Fair P/E=25 → FV = 25 × $5 = $125. Capped at 40× to avoid absurd valuations for hyper-growth names.</p>
         </div>
         <p>This only fires when growth is positive. For declining-earnings companies, only DCF and Graham are used.</p>
+
+        <!-- GROWTH RATE SELECTION -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">🎯 Growth Rate Selection (Forward vs. Trailing)</h4>
+        <p>Both the DCF and PEG models need a growth rate. Choosing the right one is critical — using inflated trailing growth produces absurd FV estimates for cyclical or one-time-spike stocks.</p>
+
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:16px; margin:16px 0;">
+          <p style="margin:0 0 8px 0; font-weight:600; color:var(--text-primary);">Priority Order:</p>
+          <ol style="margin:0; padding-left:20px; font-size:0.85rem;">
+            <li><strong>Forward-implied growth</strong> (preferred): <code>P/E ÷ Forward PEG</code> — reflects analyst consensus expectations for future growth</li>
+            <li><strong>Trailing TTM EPS growth</strong> (fallback): Used when Forward PEG isn't available (smaller/less-covered stocks)</li>
+            <li><strong>8% default</strong>: Used when neither is available</li>
+          </ol>
+        </div>
+
+        <p><strong>Why forward is better:</strong></p>
+        <table style="width:100%; border-collapse:collapse; margin:12px 0; font-size:0.8rem;">
+          <tr style="background:var(--bg-secondary); border-bottom:1px solid var(--border);">
+            <th style="padding:8px; text-align:left;">Stock</th>
+            <th style="padding:8px; text-align:left;">TTM Growth</th>
+            <th style="padding:8px; text-align:left;">Forward Growth</th>
+            <th style="padding:8px; text-align:left;">Which is realistic?</th>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px;">AFL (Aflac)</td>
+            <td style="padding:8px;">+37.6%</td>
+            <td style="padding:8px;">~3.7%</td>
+            <td style="padding:8px;">Forward ✓ (one-time spike from yen/investment gains)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px;">NVDA</td>
+            <td style="padding:8px;">+120%</td>
+            <td style="padding:8px;">~35%</td>
+            <td style="padding:8px;">Forward ✓ (TTM reflected one-time AI ramp; forward reflects normalization)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px;">CPB (Campbell's)</td>
+            <td style="padding:8px;">+5%</td>
+            <td style="padding:8px;">~5%</td>
+            <td style="padding:8px;">Either ✓ (stable grower — both agree)</td>
+          </tr>
+          <tr>
+            <td style="padding:8px;">New IPO</td>
+            <td style="padding:8px;">+200%</td>
+            <td style="padding:8px;">N/A</td>
+            <td style="padding:8px;">TTM fallback (no analyst coverage yet)</td>
+          </tr>
+        </table>
+
+        <p style="font-size:0.8rem; color:var(--text-secondary);"><strong>Tooltip shows:</strong> Hover over FV to see which growth source was used — "[Growth: X.X% Fwd]" or "[Growth: X.X% TTM]". This lets you know whether the estimate is forward-looking (more reliable) or backward-looking (use with caution).</p>
 
         <!-- BDC/REIT EXCEPTION -->
         <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">🏢 Special Case: BDCs & REITs (NAV-Based Valuation)</h4>
