@@ -1991,6 +1991,215 @@ function renderDataSourcesPrimer(container) {
           </tr>
         </table>
 
+        <h4 style="color:var(--blue);">🤖 AI Development Assistant</h4>
+        <div style="background:var(--bg-secondary); padding:16px; border-radius:8px; margin-bottom:20px;">
+          <p style="margin:0 0 12px 0;">This dashboard is built and maintained entirely via conversational AI — no manual coding. Here's the current setup and how to transition if needed.</p>
+        </div>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">Current Setup (as of June 2026)</h5>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:140px;">Tool</td>
+            <td style="padding:6px;"><strong>GitHub Copilot CLI</strong> (terminal-based AI assistant)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Model</td>
+            <td style="padding:6px;">Claude Opus 4.6 (Anthropic) — selected via Copilot model picker</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Access</td>
+            <td style="padding:6px;">Microsoft employee benefit (Copilot Enterprise via @microsoft org)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">How it works</td>
+            <td style="padding:6px;">Run <code>ghcs</code> in terminal → describe what you want in plain English → AI reads/edits files, runs git commands, pushes to GitHub</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Capabilities used</td>
+            <td style="padding:6px;">File read/edit, git commit/push, web search, image understanding (screenshots), PowerShell execution</td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">Context</td>
+            <td style="padding:6px;">AI has full access to the repo files — just say "add ticker X to watchlist Y" or "fix the bug where column Z is wrong" and it handles everything including git push</td>
+          </tr>
+        </table>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">🔑 Onboarding Prompt for Any New AI</h5>
+        <div style="background:#1a1a2e; padding:16px; border-radius:8px; margin-bottom:16px; border:1px solid var(--border);">
+          <p style="margin:0 0 8px 0; color:var(--yellow); font-weight:600;">Copy-paste this to any AI assistant to get it up to speed:</p>
+          <pre style="margin:0; white-space:pre-wrap; font-size:0.75rem; color:var(--text-secondary);">I have a single-file stock dashboard (index.html) hosted on GitHub Pages.
+Repo: github.com/jnishiguchi808/mirai-shisan-808
+It's pure HTML/CSS/JS — no build step, no framework.
+
+Key architecture:
+- All watchlists are JS arrays in a WATCHLIST object near line ~234
+- Data is fetched client-side from: Finnhub (API key in code), StockAnalysis
+  (__data.json via corsproxy.io), Macrotrends (HTML scraping via allorigins),
+  Yahoo Finance (v8 chart API via allorigins)
+- Column order: Ticker, Signal, Price, Chg$, Chg%, Beta, P/B, P/E, 5Y P/E,
+  PEG, Div%, Payout, Ex-Div, Earnings, 52W Hi, 52W Lo, FV, Analyst Lo/Mid/Hi, Vol, Links
+- localStorage caching (15-min TTL) with parallel fetch (5 concurrent)
+- Research/primer pages are rendered by functions like renderTechAnalysis(),
+  renderFairValuePrimer(), renderDividendCoveragePrimer(), renderDataSourcesPrimer()
+- Sidebar navigation drives a loadView() switch statement
+- Portfolio page uses localStorage for holdings (never sent to server)
+
+To make changes: edit index.html, git commit, git push. GitHub Pages deploys automatically.
+The "Data Sources & Hosting" page in the Research section has full documentation.</pre>
+        </div>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">📋 Option A: Personal GitHub Copilot Subscription</h5>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:140px;">Product</td>
+            <td style="padding:6px;">GitHub Copilot Pro (or Pro+)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Cost</td>
+            <td style="padding:6px;">~$10-39/month (as of 2026)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Sign up</td>
+            <td style="padding:6px;"><a href="https://github.com/features/copilot" target="_blank" style="color:var(--blue);">github.com/features/copilot</a> — sign in with your <code>jnishiguchi808</code> account</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">CLI access</td>
+            <td style="padding:6px;">Install: <code>gh extension install github/gh-copilot</code> then run <code>ghcs</code></td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">Models available</td>
+            <td style="padding:6px;">Claude (Anthropic), GPT (OpenAI), Gemini (Google) — selectable in settings</td>
+          </tr>
+        </table>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">📋 Option B: Claude Direct (Anthropic)</h5>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:140px;">Product</td>
+            <td style="padding:6px;">Claude Pro / Claude Max</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Cost</td>
+            <td style="padding:6px;">~$20-100/month</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Sign up</td>
+            <td style="padding:6px;"><a href="https://claude.ai" target="_blank" style="color:var(--blue);">claude.ai</a></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">How to use</td>
+            <td style="padding:6px;">Paste the onboarding prompt above + paste index.html content. Ask it to make changes, then copy the output back to your file and git push manually.</td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">Limitation</td>
+            <td style="padding:6px;">No direct file system access — you'd paste code in and copy code out (unless using Claude's "Projects" or "Artifacts" features)</td>
+          </tr>
+        </table>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">📋 Option C: Google Gemini</h5>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:140px;">Product</td>
+            <td style="padding:6px;">Gemini Advanced (via Google One AI Premium)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Cost</td>
+            <td style="padding:6px;">~$20/month</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Sign up</td>
+            <td style="padding:6px;"><a href="https://gemini.google.com" target="_blank" style="color:var(--blue);">gemini.google.com</a></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">How to use</td>
+            <td style="padding:6px;">Same as Claude — paste onboarding prompt + code. Gemini also supports file uploads and can generate code in Canvas mode.</td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">Strength</td>
+            <td style="padding:6px;">Large context window (1M+ tokens) — can ingest the entire index.html easily</td>
+          </tr>
+        </table>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">📋 Option D: ChatGPT (OpenAI)</h5>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:140px;">Product</td>
+            <td style="padding:6px;">ChatGPT Plus / Pro</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Cost</td>
+            <td style="padding:6px;">~$20-200/month</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Sign up</td>
+            <td style="padding:6px;"><a href="https://chat.openai.com" target="_blank" style="color:var(--blue);">chat.openai.com</a></td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">How to use</td>
+            <td style="padding:6px;">Paste onboarding prompt + code. ChatGPT has "Code Interpreter" and can generate full files. Can also use GPT via GitHub Copilot (Option A).</td>
+          </tr>
+        </table>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">📋 Option E: Cursor / Windsurf / Cline (IDE-based)</h5>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:140px;">Products</td>
+            <td style="padding:6px;">Cursor ($20/mo), Windsurf ($15/mo), Cline (free VS Code extension + bring your own API key)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">How to use</td>
+            <td style="padding:6px;">Open the repo folder → AI reads all files automatically → describe changes in chat → it edits files directly (like Copilot CLI but in a GUI editor)</td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">Best for</td>
+            <td style="padding:6px;">Closest experience to what you have now with Copilot CLI — direct file editing + git integration. No copy-paste needed.</td>
+          </tr>
+        </table>
+
+        <h5 style="color:var(--yellow); margin-bottom:8px;">🏆 Recommended Transition Path</h5>
+        <div style="background:var(--bg-secondary); padding:16px; border-radius:8px; margin-bottom:16px;">
+          <ol style="margin:0; padding-left:20px; font-size:0.8rem;">
+            <li style="margin-bottom:8px;"><strong>Easiest (same experience):</strong> Subscribe to GitHub Copilot Pro on your personal <code>jnishiguchi808</code> account. Same tool, same commands, same repo access. Nothing changes except who pays.</li>
+            <li style="margin-bottom:8px;"><strong>Best GUI alternative:</strong> Cursor or Windsurf. Open the repo, talk to the AI, it edits files. Closest UX to Copilot CLI.</li>
+            <li style="margin-bottom:8px;"><strong>Free fallback:</strong> Use any AI chat (Claude, Gemini, ChatGPT free tiers) + paste the onboarding prompt. More manual (copy-paste code) but zero cost.</li>
+            <li style="margin-bottom:0;"><strong>No AI needed for simple changes:</strong> Adding a ticker is just editing one line in the WATCHLIST object. Open index.html in any text editor, find the array, add the ticker alphabetically, save, <code>git push</code>.</li>
+          </ol>
+        </div>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">📁 What the AI Needs to Know (Cheat Sheet)</h5>
+        <div style="background:#1a1a2e; padding:16px; border-radius:8px; border:1px solid var(--border);">
+          <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:6px; font-weight:600;">Repo</td>
+              <td style="padding:6px;"><code>github.com/jnishiguchi808/mirai-shisan-808</code></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:6px; font-weight:600;">Single file</td>
+              <td style="padding:6px;"><code>index.html</code> (~2000+ lines, HTML + CSS + JS)</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:6px; font-weight:600;">Deploy</td>
+              <td style="padding:6px;"><code>git push</code> → GitHub Pages auto-deploys in ~30 seconds</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:6px; font-weight:600;">Add ticker</td>
+              <td style="padding:6px;">Find <code>WATCHLIST</code> object → add to appropriate array → keep alphabetical</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:6px; font-weight:600;">Add watchlist</td>
+              <td style="padding:6px;">Add array to WATCHLIST object + sidebar link + loadView case</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:6px; font-weight:600;">Add column</td>
+              <td style="padding:6px;">Add &lt;th&gt; header + shift all cell indices after it + add data population logic</td>
+            </tr>
+            <tr>
+              <td style="padding:6px; font-weight:600;">Add primer page</td>
+              <td style="padding:6px;">Add sidebar link + loadView case + new render function</td>
+            </tr>
+          </table>
+        </div>
+
       </div>
     </div>
   `;
