@@ -729,16 +729,22 @@ async function fetchWatchlistData(tickers, tbodyId, category) {
   // Build a set of BDC/REIT tickers for per-ticker NAV-based FV detection
   const navTickers = new Set([...(WATCHLIST.bdc || []), ...(WATCHLIST.reit || [])]);
 
+  // Build a set of ETF tickers — FV is suppressed for these (per-ticker, not per-watchlist)
+  const etfTickers = new Set([
+    ...(WATCHLIST.etfs || []), ...(WATCHLIST.etf_sp500 || []), ...(WATCHLIST.etf_russell || []),
+    ...(WATCHLIST.etf_yieldmax || []), ...(WATCHLIST.fidelity || []), ...(WATCHLIST.vanguard || [])
+  ]);
+
   // Build per-ticker fetch tasks
-  const tasks = tickers.map((ticker, i) => () => fetchSingleTicker(ticker, i, tbody, navTickers.has(ticker)));
+  const tasks = tickers.map((ticker, i) => () => fetchSingleTicker(ticker, i, tbody, navTickers.has(ticker), etfTickers.has(ticker)));
   // Run 5 tickers in parallel (stays under Finnhub 60/min with 2 calls per ticker)
   await parallelLimit(tasks, 5);
 }
 
-async function fetchSingleTicker(ticker, i, tbody, navBasedFV) {
+async function fetchSingleTicker(ticker, i, tbody, navBasedFV, isETF) {
   try {
     const cached = cacheGet(ticker);
-    if (cached) { applyTickerData(cached, i, tbody, ticker, navBasedFV); return; }
+    if (cached) { applyTickerData(cached, i, tbody, ticker, navBasedFV, isETF); return; }
 
     const tickerData = {};
 
@@ -768,7 +774,7 @@ async function fetchSingleTicker(ticker, i, tbody, navBasedFV) {
     // Cache the result
     cacheSet(ticker, tickerData);
     // Apply to DOM
-    applyTickerData(tickerData, i, tbody, ticker, navBasedFV);
+    applyTickerData(tickerData, i, tbody, ticker, navBasedFV, isETF);
   } catch(e) { /* skip failed ticker */ }
 }
 
@@ -844,7 +850,7 @@ async function fetchYahooSignal(ticker) {
   return null;
 }
 
-function applyTickerData(data, i, tbody, ticker, navBasedFV) {
+function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
   const row = tbody.children[i];
   if (!row) return;
   const cells = row.cells;
@@ -959,7 +965,10 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV) {
     const bookVal = m.bookValuePerShareAnnual;
     const currentPrice = parseFloat(cells[2].textContent.replace('$',''));
 
-    if (navBasedFV && bookVal && bookVal > 0 && currentPrice > 0) {
+    if (isETF) {
+      // ETFs: FV not applicable — arbitrage keeps price ≈ NAV
+      cells[16].innerHTML = `<span style="color:var(--text-secondary);" title="FV not applicable for ETFs (price = NAV by design)">—</span>`;
+    } else if (navBasedFV && bookVal && bookVal > 0 && currentPrice > 0) {
       // NAV-based FV for BDCs/REITs — fair value = book value (NAV)
       const gap = ((bookVal - currentPrice) / currentPrice * 100).toFixed(0);
       const fvColor = bookVal > currentPrice * 1.05 ? 'var(--green)' : bookVal < currentPrice * 0.95 ? 'var(--red)' : 'var(--text-primary)';
