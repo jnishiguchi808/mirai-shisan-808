@@ -196,6 +196,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="tech-analysis">Technical Analysis</a>
     <a href="#" data-view="fair-value">Fair Value Calculation</a>
     <a href="#" data-view="dividend-coverage">Dividend Coverage</a>
+    <a href="#" data-view="data-sources">Data Sources & Hosting</a>
     <a href="#" data-view="news">News &amp; Analysts</a>
     <a href="#" data-view="sectors">Sector Heatmap</a>
     <a href="#" data-view="macro">Macro &amp; Economy</a>
@@ -419,6 +420,7 @@ function loadView(view) {
     case 'tech-analysis': renderTechAnalysis(main); break;
     case 'fair-value': renderFairValuePrimer(main); break;
     case 'dividend-coverage': renderDividendCoveragePrimer(main); break;
+    case 'data-sources': renderDataSourcesPrimer(main); break;
     case 'macro': renderMacro(main); break;
     case 'valuation': renderValuation(main); break;
     case 'notes': renderNotes(main); break;
@@ -1679,6 +1681,319 @@ function renderSectors(container) {
       <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; color:${isUp?'var(--green)':'var(--red)'};">${isUp?'+':''}${pct}%</div>
     </div>`;
   }).join('');
+}
+
+// ============================================
+// RENDER: DATA SOURCES & HOSTING PRIMER
+// ============================================
+function renderDataSourcesPrimer(container) {
+  container.innerHTML = `
+    <div class="panel" style="max-width:900px;">
+      <div class="panel-header"><h3>Data Sources & Hosting</h3></div>
+      <div class="panel-body" style="padding:24px; line-height:1.7; font-size:0.85rem;">
+
+        <h4 style="color:var(--blue); margin-top:0;">🏠 Hosting</h4>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px; font-weight:600;">Platform</td>
+            <td style="padding:8px;">GitHub Pages (static HTML, no backend)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px; font-weight:600;">Repository</td>
+            <td style="padding:8px;"><a href="https://github.com/jnishiguchi808/mirai-shisan-808" target="_blank" style="color:var(--blue);">github.com/jnishiguchi808/mirai-shisan-808</a></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px; font-weight:600;">GitHub Account</td>
+            <td style="padding:8px;">jnishiguchi808</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px; font-weight:600;">Live URL</td>
+            <td style="padding:8px;"><a href="https://jnishiguchi808.github.io/mirai-shisan-808/" target="_blank" style="color:var(--blue);">jnishiguchi808.github.io/mirai-shisan-808</a></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px; font-weight:600;">Architecture</td>
+            <td style="padding:8px;">Single-file (index.html) — all HTML, CSS, JS in one file. No build step, no framework.</td>
+          </tr>
+          <tr>
+            <td style="padding:8px; font-weight:600;">Cost</td>
+            <td style="padding:8px;">Free (GitHub Pages free tier, no bandwidth limits for personal sites)</td>
+          </tr>
+        </table>
+
+        <h4 style="color:var(--blue);">📊 Data Sources</h4>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">1. Finnhub.io — Primary Market Data</h5>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:140px;">Website</td>
+            <td style="padding:6px;"><a href="https://finnhub.io" target="_blank" style="color:var(--blue);">finnhub.io</a></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Account</td>
+            <td style="padding:6px;">Registered under personal email (free tier)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Plan</td>
+            <td style="padding:6px;"><span style="color:var(--green); font-weight:600;">Free</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Rate Limit</td>
+            <td style="padding:6px;">60 API calls/minute (free), 300/min (Starter $50/mo), 600/min (Pro $200/mo)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Data Used</td>
+            <td style="padding:6px;">
+              <code>/quote</code> — Real-time price, change, volume<br>
+              <code>/stock/metric</code> — Beta, P/B, P/E, PEG, Dividend Yield, 52W Hi/Lo, EPS, Book Value, Cash Flow/Share, Payout Ratio
+            </td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">CORS Proxy</td>
+            <td style="padding:6px;">None needed — Finnhub allows browser-direct calls with API key</td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">Limitations</td>
+            <td style="padding:6px;">Free tier: no websocket streaming, 1-year historical only, some premium endpoints locked. Rate limit is the main constraint for large watchlists.</td>
+          </tr>
+        </table>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">2. StockAnalysis.com — Analyst Targets, Earnings, Ex-Div</h5>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:140px;">Website</td>
+            <td style="padding:6px;"><a href="https://stockanalysis.com" target="_blank" style="color:var(--blue);">stockanalysis.com</a></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Account</td>
+            <td style="padding:6px;">No account needed — scraping public <code>__data.json</code> endpoints</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Plan</td>
+            <td style="padding:6px;"><span style="color:var(--green); font-weight:600;">Free</span> (no API — we use their SvelteKit data endpoints)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Data Used</td>
+            <td style="padding:6px;">
+              <code>/stocks/TICK/__data.json</code> — Company name, Ex-Dividend date, Earnings date<br>
+              <code>/stocks/TICK/forecast/__data.json</code> — Analyst price targets (Low, Median, High)
+            </td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">CORS Proxy</td>
+            <td style="padding:6px;"><code>corsproxy.io</code> — free, no account needed</td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">Limitations</td>
+            <td style="padding:6px;">Not an official API — endpoint structure may change if they redesign their site. No rate limit documented, but aggressive scraping could get IP blocked. ETFs may not have forecast data.</td>
+          </tr>
+        </table>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">3. Macrotrends.net — 5-Year Historical P/E</h5>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:140px;">Website</td>
+            <td style="padding:6px;"><a href="https://www.macrotrends.net" target="_blank" style="color:var(--blue);">macrotrends.net</a></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Account</td>
+            <td style="padding:6px;">No account needed — scraping public HTML tables</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Plan</td>
+            <td style="padding:6px;"><span style="color:var(--green); font-weight:600;">Free</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Data Used</td>
+            <td style="padding:6px;"><code>/stocks/charts/TICK/x/pe-ratio</code> — Quarterly P/E history, parsed to compute 5-year median</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">CORS Proxy</td>
+            <td style="padding:6px;"><code>api.allorigins.win</code> — free, no account needed</td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">Limitations</td>
+            <td style="padding:6px;">HTML scraping — fragile if they change page structure. Relatively slow (~500-800ms per ticker). May not have data for newer/smaller companies.</td>
+          </tr>
+        </table>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">4. Yahoo Finance — Technical Signal (MA/RSI)</h5>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:140px;">Website</td>
+            <td style="padding:6px;"><a href="https://finance.yahoo.com" target="_blank" style="color:var(--blue);">finance.yahoo.com</a></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Account</td>
+            <td style="padding:6px;">No account needed — using undocumented v8 chart API</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Plan</td>
+            <td style="padding:6px;"><span style="color:var(--green); font-weight:600;">Free</span> (unofficial API)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Data Used</td>
+            <td style="padding:6px;"><code>/v8/finance/chart/TICK?interval=1d&range=1y</code> — 1 year of daily closing prices → compute 50MA, 200MA, RSI(14)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">CORS Proxy</td>
+            <td style="padding:6px;"><code>api.allorigins.win</code> — free, no account needed</td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">Limitations</td>
+            <td style="padding:6px;">Unofficial/undocumented — Yahoo can break or block at any time. Needs 200+ trading days of data (won't work for IPOs < 1 year old). Heavier payload (~50-100KB per ticker).</td>
+          </tr>
+        </table>
+
+        <h4 style="color:var(--blue);">🔀 CORS Proxies Used</h4>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:0.8rem;">
+          <tr style="background:var(--bg-secondary); border-bottom:1px solid var(--border);">
+            <th style="padding:8px; text-align:left;">Proxy</th>
+            <th style="padding:8px; text-align:left;">Used For</th>
+            <th style="padding:8px; text-align:left;">Cost</th>
+            <th style="padding:8px; text-align:left;">Risk</th>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;"><code>corsproxy.io</code></td>
+            <td style="padding:6px;">StockAnalysis</td>
+            <td style="padding:6px;">Free</td>
+            <td style="padding:6px;">Could go down or add rate limits</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;"><code>api.allorigins.win</code></td>
+            <td style="padding:6px;">Macrotrends, Yahoo Finance</td>
+            <td style="padding:6px;">Free</td>
+            <td style="padding:6px;">Open-source proxy; could be unreliable under heavy load</td>
+          </tr>
+        </table>
+        <p style="color:var(--text-secondary); font-size:0.75rem;"><strong>Why proxies?</strong> Browsers enforce CORS (Cross-Origin Resource Sharing). StockAnalysis, Macrotrends, and Yahoo don't set <code>Access-Control-Allow-Origin</code> headers, so direct browser requests are blocked. These proxies relay the request server-side and add the header. Finnhub doesn't need one because their API explicitly allows browser access.</p>
+
+        <h4 style="color:var(--blue);">⚡ Caching & Performance</h4>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:140px;">Cache Location</td>
+            <td style="padding:6px;">Browser localStorage (per-device, per-browser — not shared between machines)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Cache TTL</td>
+            <td style="padding:6px;">15 minutes — after expiry, fresh data is fetched</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Concurrency</td>
+            <td style="padding:6px;">5 tickers fetched in parallel (balances speed vs. Finnhub rate limit)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">First Load</td>
+            <td style="padding:6px;">~12-15 seconds for a 22-ticker watchlist</td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">Cached Load</td>
+            <td style="padding:6px;">Near-instant (< 100ms)</td>
+          </tr>
+        </table>
+
+        <h4 style="color:var(--blue);">💰 Cost Summary</h4>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:0.8rem;">
+          <tr style="background:var(--bg-secondary); border-bottom:1px solid var(--border);">
+            <th style="padding:8px; text-align:left;">Service</th>
+            <th style="padding:8px; text-align:left;">Current Plan</th>
+            <th style="padding:8px; text-align:left;">Monthly Cost</th>
+            <th style="padding:8px; text-align:left;">Upgrade If…</th>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">Finnhub</td>
+            <td style="padding:6px;">Free</td>
+            <td style="padding:6px;">$0</td>
+            <td style="padding:6px;">Watchlists > 30 tickers feel slow (Starter: $50/mo for 300 calls/min)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">StockAnalysis</td>
+            <td style="padding:6px;">Free (scraping)</td>
+            <td style="padding:6px;">$0</td>
+            <td style="padding:6px;">They block scraping (no official API available)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">Macrotrends</td>
+            <td style="padding:6px;">Free (scraping)</td>
+            <td style="padding:6px;">$0</td>
+            <td style="padding:6px;">They block scraping (alternative: compute 5Y P/E from Finnhub EPS history)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">Yahoo Finance</td>
+            <td style="padding:6px;">Free (unofficial API)</td>
+            <td style="padding:6px;">$0</td>
+            <td style="padding:6px;">API gets blocked (alternative: use Finnhub historical candles on paid tier)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">GitHub Pages</td>
+            <td style="padding:6px;">Free</td>
+            <td style="padding:6px;">$0</td>
+            <td style="padding:6px;">N/A — no reason to upgrade for a personal dashboard</td>
+          </tr>
+          <tr style="font-weight:700; background:var(--bg-secondary);">
+            <td style="padding:8px;">TOTAL</td>
+            <td style="padding:8px;"></td>
+            <td style="padding:8px; color:var(--green);">$0/month</td>
+            <td style="padding:8px;"></td>
+          </tr>
+        </table>
+
+        <h4 style="color:var(--blue);">⚠️ Fragility Risks</h4>
+        <div style="background:var(--bg-secondary); padding:16px; border-radius:8px; margin-bottom:20px;">
+          <p style="margin:0 0 8px 0;"><strong>What could break and how to fix it:</strong></p>
+          <ol style="margin:0; padding-left:20px;">
+            <li style="margin-bottom:8px;"><strong>CORS proxy goes down</strong> — Replace <code>corsproxy.io</code> or <code>api.allorigins.win</code> with another free proxy (e.g., <code>cors-anywhere</code>, <code>thingproxy</code>) or self-host one on Cloudflare Workers (free tier).</li>
+            <li style="margin-bottom:8px;"><strong>StockAnalysis changes <code>__data.json</code> structure</strong> — Their SvelteKit data format may change on redesign. Fix: inspect new JSON structure in browser DevTools and update parsing logic.</li>
+            <li style="margin-bottom:8px;"><strong>Yahoo blocks the chart API</strong> — They've done this before. Fallback: use Finnhub historical candles (requires paid tier) or Alpha Vantage (free, 25 calls/day).</li>
+            <li style="margin-bottom:8px;"><strong>Finnhub retires free tier</strong> — Unlikely soon, but if so: Alpha Vantage or Financial Modeling Prep are alternatives with free tiers.</li>
+            <li style="margin-bottom:0;"><strong>Macrotrends redesigns HTML</strong> — Update the regex in <code>fetchMacrotrends()</code> to match new table structure.</li>
+          </ol>
+        </div>
+
+        <h4 style="color:var(--blue);">🗂️ Column → Source Mapping</h4>
+        <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+          <tr style="background:var(--bg-secondary); border-bottom:1px solid var(--border);">
+            <th style="padding:6px; text-align:left;">Column</th>
+            <th style="padding:6px; text-align:left;">Source</th>
+            <th style="padding:6px; text-align:left;">Endpoint/Field</th>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">Signal</td><td style="padding:6px;">Yahoo Finance</td><td style="padding:6px;">v8 chart → computed 50MA/200MA/RSI</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">Price, Chg$, Chg%, Vol</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/quote → c, pc, v</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">Beta, P/B, P/E, PEG</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/stock/metric → beta, pbAnnual, peNormalized, pegTTM</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">5Y P/E</td><td style="padding:6px;">Macrotrends</td><td style="padding:6px;">HTML table scrape → 5yr median</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">Div%</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/stock/metric → dividendYieldIndicatedAnnual</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">Payout</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/stock/metric → dividendPerShareAnnual / cashFlowPerShareTTM</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">Ex-Div, Earnings</td><td style="padding:6px;">StockAnalysis</td><td style="padding:6px;">__data.json → exDividendDate, earningsDate</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">52W Hi/Lo</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/stock/metric → 52WeekHigh, 52WeekLow</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">FV (Fair Value)</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">Computed: DCF + Graham + PEG models from EPS, growth, book value</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">Analyst Lo/Mid/Hi</td><td style="padding:6px;">StockAnalysis</td><td style="padding:6px;">/forecast/__data.json → priceTargets</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;">Company Name (tooltip)</td><td style="padding:6px;">StockAnalysis</td><td style="padding:6px;">__data.json → name</td>
+          </tr>
+        </table>
+
+      </div>
+    </div>
+  `;
 }
 
 // ============================================
