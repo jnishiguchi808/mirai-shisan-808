@@ -690,7 +690,7 @@ function renderWatchlist(container, category, title) {
   `;
 
   // Fetch data for all tickers (throttled)
-  fetchWatchlistData(tickers, 'watchlist-body');
+  fetchWatchlistData(tickers, 'watchlist-body', category);
 }
 
 // --- Cache utilities (localStorage, 15-min TTL) ---
@@ -722,20 +722,23 @@ async function parallelLimit(tasks, limit) {
   return results;
 }
 
-async function fetchWatchlistData(tickers, tbodyId) {
+async function fetchWatchlistData(tickers, tbodyId, category) {
   const tbody = document.getElementById(tbodyId);
   if (!tbody) return;
 
+  // Build a set of BDC/REIT tickers for per-ticker NAV-based FV detection
+  const navTickers = new Set([...(WATCHLIST.bdc || []), ...(WATCHLIST.reit || [])]);
+
   // Build per-ticker fetch tasks
-  const tasks = tickers.map((ticker, i) => () => fetchSingleTicker(ticker, i, tbody));
+  const tasks = tickers.map((ticker, i) => () => fetchSingleTicker(ticker, i, tbody, navTickers.has(ticker)));
   // Run 5 tickers in parallel (stays under Finnhub 60/min with 2 calls per ticker)
   await parallelLimit(tasks, 5);
 }
 
-async function fetchSingleTicker(ticker, i, tbody) {
+async function fetchSingleTicker(ticker, i, tbody, navBasedFV) {
   try {
     const cached = cacheGet(ticker);
-    if (cached) { applyTickerData(cached, i, tbody, ticker); return; }
+    if (cached) { applyTickerData(cached, i, tbody, ticker, navBasedFV); return; }
 
     const tickerData = {};
 
@@ -765,7 +768,7 @@ async function fetchSingleTicker(ticker, i, tbody) {
     // Cache the result
     cacheSet(ticker, tickerData);
     // Apply to DOM
-    applyTickerData(tickerData, i, tbody, ticker);
+    applyTickerData(tickerData, i, tbody, ticker, navBasedFV);
   } catch(e) { /* skip failed ticker */ }
 }
 
@@ -841,7 +844,7 @@ async function fetchYahooSignal(ticker) {
   return null;
 }
 
-function applyTickerData(data, i, tbody, ticker) {
+function applyTickerData(data, i, tbody, ticker, navBasedFV) {
   const row = tbody.children[i];
   if (!row) return;
   const cells = row.cells;
@@ -955,7 +958,15 @@ function applyTickerData(data, i, tbody, ticker) {
     const epsGrowth = m.epsGrowthTTMYoy;
     const bookVal = m.bookValuePerShareAnnual;
     const currentPrice = parseFloat(cells[2].textContent.replace('$',''));
-    if (eps && eps > 0) {
+
+    if (navBasedFV && bookVal && bookVal > 0 && currentPrice > 0) {
+      // NAV-based FV for BDCs/REITs — fair value = book value (NAV)
+      const gap = ((bookVal - currentPrice) / currentPrice * 100).toFixed(0);
+      const fvColor = bookVal > currentPrice * 1.05 ? 'var(--green)' : bookVal < currentPrice * 0.95 ? 'var(--red)' : 'var(--text-primary)';
+      const pb = (currentPrice / bookVal).toFixed(2);
+      const tipText = `NAV-based: Book Value $${bookVal.toFixed(2)} | P/B: ${pb}x | ${gap > 0 ? '+' : ''}${gap}% vs price`;
+      cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${bookVal.toFixed(0)}</span>`;
+    } else if (eps && eps > 0) {
       let models = [];
       let tips = [];
       const g = epsGrowth ? Math.min(Math.max(epsGrowth / 100, -0.2), 0.5) : 0.08;
@@ -1434,6 +1445,44 @@ function renderFairValuePrimer(container) {
         </div>
         <p>This only fires when growth is positive. For declining-earnings companies, only DCF and Graham are used.</p>
 
+        <!-- BDC/REIT EXCEPTION -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">🏢 Special Case: BDCs & REITs (NAV-Based Valuation)</h4>
+        <p>The three models above (DCF, Graham, PEG) <strong>do not work</strong> for BDCs and REITs. These are pass-through entities that distribute nearly all income — they don't retain earnings to grow like traditional companies.</p>
+
+        <div style="background:var(--bg-card); border:1px solid var(--yellow); border-radius:8px; padding:16px; margin:12px 0;">
+          <p style="margin:0 0 8px 0; font-weight:600; color:var(--yellow);">Why Traditional Models Fail:</p>
+          <ul style="margin:0; padding-left:20px; font-size:0.8rem;">
+            <li><strong>"EPS" is misleading</strong> — For BDCs, EPS includes unrealized portfolio gains/losses. For REITs, FFO (Funds From Operations) is the real metric, not EPS.</li>
+            <li><strong>Growth assumptions are wrong</strong> — A BDC with +164% "EPS growth" (like GAIN) isn't actually growing 164%. It's mark-to-market fluctuation.</li>
+            <li><strong>DCF produces absurd results</strong> — Plugging inflated EPS into a growth model gives FV estimates 10-20x higher than reality.</li>
+          </ul>
+        </div>
+
+        <p><strong>Our solution:</strong> For any ticker that appears in the BDC or REIT watchlists, we use <strong>NAV-based Fair Value</strong> instead:</p>
+        <div style="background:var(--bg-card); border-radius:8px; padding:16px; margin:12px 0; text-align:center;">
+          <p style="font-size:1.1rem; margin:0; color:var(--text-primary);"><strong>FV = Book Value per Share (NAV)</strong></p>
+          <p style="font-size:0.8rem; margin:8px 0 0 0; color:var(--text-secondary);">This is the same number used to calculate P/B ratio. For BDCs/REITs, P/B tells you if you're buying at a premium or discount to net asset value.</p>
+        </div>
+
+        <table style="width:100%; border-collapse:collapse; margin:12px 0; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px; font-weight:600; color:var(--green);">FV > Price (green)</td>
+            <td style="padding:8px;">Trading below NAV — you're buying $1 of assets for less than $1. Potential bargain.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px; font-weight:600;">FV ≈ Price (white)</td>
+            <td style="padding:8px;">Trading near NAV (within ±5%) — fairly valued.</td>
+          </tr>
+          <tr>
+            <td style="padding:8px; font-weight:600; color:var(--red);">FV < Price (red)</td>
+            <td style="padding:8px;">Trading above NAV — paying a premium for management quality or dividend track record. Not necessarily bad, but know you're overpaying for the assets.</td>
+          </tr>
+        </table>
+
+        <p style="font-size:0.8rem; color:var(--text-secondary);"><strong>How detection works:</strong> This is <em>per-ticker</em>, not per-watchlist. Any ticker that appears in the BDC or REIT watchlist arrays gets NAV-based FV regardless of which watchlist you're currently viewing. So if O (Realty Income) appears in both "REIT" and "Equities" watchlists, it will correctly use NAV-based FV in both places.</p>
+
+        <p style="font-size:0.8rem; color:var(--text-secondary);"><strong>Tooltip shows:</strong> Hover over the FV cell to see Book Value per share, P/B ratio, and % gap vs current price.</p>
+
         <!-- LIMITATIONS -->
         <h4 style="color:var(--red); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">⚠️ Limitations & Caveats</h4>
         <ul style="margin:8px 0 8px 20px;">
@@ -1441,7 +1490,7 @@ function renderFairValuePrimer(container) {
           <li><strong>No free cash flow data.</strong> Professional DCFs use free cash flow (FCF), not EPS. EPS can be manipulated by accounting choices (depreciation, stock-based comp, one-time charges). Our model uses normalized EPS as the closest available proxy from Finnhub's free tier.</li>
           <li><strong>Single discount rate.</strong> We use a flat 10% discount rate for all stocks. In reality, a utility should use ~7% and a speculative biotech ~15%. This oversimplifies risk.</li>
           <li><strong>Growth rate clamping.</strong> We cap growth at +50% and floor it at -20%. This prevents absurd FV estimates but also means hyper-growth or deeply cyclical stocks won't be accurately modeled.</li>
-          <li><strong>No sector-specific adjustments.</strong> REITs, banks, and utilities have fundamentally different valuation frameworks (NAV, dividend discount, regulated asset base). Our one-size-fits-all approach will be less accurate for these sectors.</li>
+          <li><strong>Limited sector-specific adjustments.</strong> We now handle BDCs and REITs with NAV-based FV (see above), but banks and utilities still use the generic models. Banks ideally use dividend discount models; utilities use regulated asset base valuation.</li>
           <li><strong>Graham Number undervalues tech.</strong> Asset-light companies (SaaS, platforms) have low book value, making Graham systematically conservative. This is a feature, not a bug — but it pulls the blended FV down for tech names.</li>
           <li><strong>Not a substitute for VectorVest or SimplyWallStreet.</strong> Those platforms use proprietary models with forward earnings consensus, sector-relative comparisons, and institutional data feeds we cannot access. Our FV is a <em>directional sanity check</em>, not a professional-grade valuation.</li>
           <li><strong>Only works with positive EPS.</strong> Pre-profit companies (many in EV, biotech, fintech) will show no FV because earnings-based models are meaningless when EPS is negative.</li>
