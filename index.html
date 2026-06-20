@@ -970,7 +970,6 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
     // Fair Value (FV)
     const eps = m.epsNormalizedAnnual;
     const epsGrowth = m.epsGrowthTTMYoy;
-    const bookVal = m.bookValuePerShareAnnual;
     const currentPrice = parseFloat(cells[2].textContent.replace('$',''));
 
     if (isETF) {
