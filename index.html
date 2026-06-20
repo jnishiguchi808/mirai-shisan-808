@@ -919,7 +919,15 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
   const m = data.metric;
   if (m) {
     cells[5].textContent = m.beta?.toFixed(2) || '—';
-    cells[6].textContent = m.pbAnnual?.toFixed(2) || '—';
+    // P/B calculated from live price / latest book value for consistency
+    const bookVal = m.bookValuePerShareAnnual;
+    const priceForPB = parseFloat(cells[2].textContent.replace('$',''));
+    if (bookVal && bookVal > 0 && priceForPB > 0) {
+      const pb = (priceForPB / bookVal).toFixed(2);
+      cells[6].innerHTML = `<span title="Price $${priceForPB.toFixed(2)} / Book $${bookVal.toFixed(2)}">${pb}</span>`;
+    } else {
+      cells[6].textContent = '—';
+    }
     cells[7].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
     const peg = m.forwardPEG || m.pegTTM;
     const growth = m.epsGrowthTTMYoy;
@@ -2059,7 +2067,7 @@ function renderDataSourcesPrimer(container) {
             <td style="padding:6px;">Price, Chg$, Chg%, Vol</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/quote → c, pc, v</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px;">Beta, P/B, P/E, PEG</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/stock/metric → beta, pbAnnual, peNormalized, pegTTM</td>
+            <td style="padding:6px;">Beta, P/B, P/E, PEG</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/stock/metric → beta, peNormalized, pegTTM; P/B = live price / bookValuePerShareAnnual</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px;">5Y P/E</td><td style="padding:6px;">Macrotrends</td><td style="padding:6px;">HTML table scrape → 5yr median</td>
