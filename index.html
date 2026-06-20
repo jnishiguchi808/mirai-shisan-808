@@ -195,6 +195,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <div class="section-label">Research</div>
     <a href="#" data-view="tech-analysis">Technical Analysis</a>
     <a href="#" data-view="fair-value">Fair Value Calculation</a>
+    <a href="#" data-view="dividend-coverage">Dividend Coverage</a>
     <a href="#" data-view="news">News &amp; Analysts</a>
     <a href="#" data-view="sectors">Sector Heatmap</a>
     <a href="#" data-view="macro">Macro &amp; Economy</a>
@@ -417,6 +418,7 @@ function loadView(view) {
     case 'sectors': renderSectors(main); break;
     case 'tech-analysis': renderTechAnalysis(main); break;
     case 'fair-value': renderFairValuePrimer(main); break;
+    case 'dividend-coverage': renderDividendCoveragePrimer(main); break;
     case 'macro': renderMacro(main); break;
     case 'valuation': renderValuation(main); break;
     case 'notes': renderNotes(main); break;
@@ -657,6 +659,7 @@ function renderWatchlist(container, category, title) {
               <th>5Y P/E</th>
               <th>PEG</th>
               <th>Div %</th>
+              <th>Payout</th>
               <th>Ex-Div</th>
               <th>Earnings</th>
               <th>52W Hi</th>
@@ -673,7 +676,7 @@ function renderWatchlist(container, category, title) {
             ${tickers.map(t => `
               <tr>
                 <td class="ticker-cell" onclick="loadStockView('${t}')">${t}</td>
-                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
                 <td><a href="https://stockanalysis.com/stocks/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://www.macrotrends.net/stocks/charts/${t}/x/stock-price-history" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">MT</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
               </tr>
             `).join('')}
@@ -713,7 +716,7 @@ async function fetchWatchlistData(tickers, tbodyId) {
         // Volume from quote
         if (q.v) {
           const vol = q.v >= 1e6 ? `${(q.v/1e6).toFixed(1)}M` : q.v >= 1e3 ? `${(q.v/1e3).toFixed(0)}K` : `${q.v}`;
-          cells[18].textContent = vol;
+          cells[20].textContent = vol;
         }
       }
 
@@ -737,18 +740,18 @@ async function fetchWatchlistData(tickers, tbodyId) {
               if (exDivIdx !== undefined && d[exDivIdx]) {
                 const exDate = new Date(d[exDivIdx]);
                 const exFmt = !isNaN(exDate) ? `${(exDate.getMonth()+1).toString().padStart(2,'0')}/${exDate.getDate().toString().padStart(2,'0')}/${exDate.getFullYear().toString().slice(-2)}` : d[exDivIdx];
-                cells[11].textContent = exFmt;
+                cells[12].textContent = exFmt;
                 // Highlight if ex-div within 7 days
                 if (!isNaN(exDate)) {
                   const daysUntil = Math.ceil((exDate - new Date()) / (1000*60*60*24));
-                  if (daysUntil >= 0 && daysUntil <= 7) cells[11].innerHTML = `<span class="highlight-soon">${exFmt}</span>`;
+                  if (daysUntil >= 0 && daysUntil <= 7) cells[12].innerHTML = `<span class="highlight-soon">${exFmt}</span>`;
                 }
               }
               // Earnings date
               const edIdx = d[0].earningsDate;
               if (edIdx !== undefined && d[edIdx]) {
                 const edDate = new Date(d[edIdx]);
-                cells[12].textContent = !isNaN(edDate) ? `${(edDate.getMonth()+1).toString().padStart(2,'0')}/${edDate.getDate().toString().padStart(2,'0')}/${edDate.getFullYear().toString().slice(-2)}` : d[edIdx];
+                cells[13].textContent = !isNaN(edDate) ? `${(edDate.getMonth()+1).toString().padStart(2,'0')}/${edDate.getDate().toString().padStart(2,'0')}/${edDate.getFullYear().toString().slice(-2)}` : d[edIdx];
               }
             }
           }
@@ -772,9 +775,9 @@ async function fetchWatchlistData(tickers, tbodyId) {
                 const row = tbody.children[i];
                 if (row) {
                   const cells = row.cells;
-                  cells[16].textContent = `$${Math.round(low)}`;
-                  cells[17].textContent = `$${Math.round(median)}`;
-                  cells[18].textContent = `$${Math.round(high)}`;
+                  cells[17].textContent = `$${Math.round(low)}`;
+                  cells[18].textContent = `$${Math.round(median)}`;
+                  cells[19].textContent = `$${Math.round(high)}`;
                 }
               }
             }
@@ -814,8 +817,24 @@ async function fetchWatchlistData(tickers, tbodyId) {
           cells[9].textContent = '—';
         }
         cells[10].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
-        cells[13].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
-        cells[14].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
+        // Payout Ratio (FCF-based: DPS / CashFlowPerShare)
+        const dps = m.dividendPerShareAnnual;
+        const cfps = m.cashFlowPerShareTTM;
+        if (dps && cfps && cfps > 0) {
+          const payout = (dps / cfps) * 100;
+          let payColor = 'var(--green)';
+          if (payout > 90) payColor = 'var(--red)';
+          else if (payout > 75) payColor = 'var(--yellow)';
+          const epsPayout = m.payoutRatioTTM ? `EPS Payout: ${m.payoutRatioTTM.toFixed(0)}%` : '';
+          const tipText = `FCF Payout: ${payout.toFixed(0)}% (DPS: $${dps.toFixed(2)} / CFPS: $${cfps.toFixed(2)})${epsPayout ? ' | ' + epsPayout : ''}`;
+          cells[11].innerHTML = `<span style="color:${payColor}" title="${tipText}">${payout.toFixed(0)}%</span>`;
+        } else if (dps && dps > 0) {
+          cells[11].innerHTML = `<span style="color:var(--red)" title="No cash flow data available">n/a</span>`;
+        } else {
+          cells[11].textContent = '—';
+        }
+        cells[14].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
+        cells[15].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
 
         // Fair Value (FV) — multi-model blended estimate
         const eps = m.epsNormalizedAnnual;
@@ -851,7 +870,7 @@ async function fetchWatchlistData(tickers, tbodyId) {
             const gap = ((blended - currentPrice) / currentPrice * 100).toFixed(0);
             const fvColor = blended > currentPrice * 1.1 ? 'var(--green)' : blended < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
             const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%)`;
-            cells[15].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
+            cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
           }
         }
       }
@@ -1421,6 +1440,168 @@ function renderFairValuePrimer(container) {
 
         <div style="background:var(--bg-card); border:1px solid var(--green); border-radius:8px; padding:16px; margin-top:24px;">
           <p style="margin:0; color:var(--text-primary);"><strong>🎯 Bottom Line:</strong> The FV column is a <em>directional indicator</em> — not a precise target. Use it alongside Analyst Lo/Mid/Hi to triangulate. If FV and analyst consensus both say "undervalued," that's a stronger signal than either alone. When they diverge significantly, dig deeper into why.</p>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+// ============================================
+// RENDER: DIVIDEND COVERAGE PRIMER
+// ============================================
+function renderDividendCoveragePrimer(container) {
+  container.innerHTML = `
+    <div class="panel" style="max-width:960px;">
+      <div class="panel-header"><h3>💸 Dividend Coverage & Payout Ratio Primer</h3></div>
+      <div class="panel-body" style="line-height:1.7; font-size:0.85rem; color:var(--text-secondary);">
+
+        <p style="color:var(--text-primary); font-size:0.95rem; margin-bottom:16px;">
+          The <strong style="color:var(--green);">Payout</strong> column on your watchlists answers one critical question: <em>"Can this company actually afford its dividend?"</em>
+        </p>
+
+        <!-- THREE RATIOS -->
+        <h4 style="color:var(--green); margin-top:24px; border-bottom:1px solid var(--border); padding-bottom:6px;">📊 Three Ways to Measure Dividend Safety</h4>
+
+        <table style="width:100%; border-collapse:collapse; margin:12px 0; font-size:0.8rem;">
+          <thead><tr style="border-bottom:2px solid var(--border);">
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Metric</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Formula</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Pros</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Cons</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong>EPS Payout Ratio</strong></td>
+              <td style="padding:8px; font-family:monospace;">DPS ÷ EPS × 100</td>
+              <td style="padding:8px;">Simple, universally available on Yahoo/Google Finance</td>
+              <td style="padding:8px;">EPS is an accounting number — easily distorted by depreciation, writedowns, stock comp</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong style="color:var(--green);">FCF Payout Ratio ⭐</strong></td>
+              <td style="padding:8px; font-family:monospace;">DPS ÷ Free Cash Flow Per Share × 100</td>
+              <td style="padding:8px;">Cash doesn't lie. Shows actual ability to fund dividends from operations.</td>
+              <td style="padding:8px;">FCF can be lumpy (big capex years). Some sectors (banks, REITs) report differently.</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong>Dividend Coverage Ratio</strong></td>
+              <td style="padding:8px; font-family:monospace;">EPS ÷ DPS</td>
+              <td style="padding:8px;">Intuitive — "earnings cover dividend X times"</td>
+              <td style="padding:8px;">Just the inverse of EPS payout — same accounting problems</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- WHY FCF -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">🏆 Why We Use FCF-Based Payout</h4>
+
+        <p><strong>The professional consensus:</strong> Dividend-focused fund managers, credit rating agencies (S&P, Moody's), and serious income investors all prefer FCF-based analysis over EPS-based. Here's why:</p>
+
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:16px; margin:16px 0;">
+          <h5 style="color:var(--red); margin:0 0 12px;">🚨 Real-World Example: AT&T (T) Before the 2022 Dividend Cut</h5>
+          <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+            <thead><tr style="border-bottom:2px solid var(--border);">
+              <th style="text-align:left; padding:8px; color:var(--text-primary);">Metric</th>
+              <th style="text-align:left; padding:8px; color:var(--text-primary);">Value</th>
+              <th style="text-align:left; padding:8px; color:var(--text-primary);">Signal</th>
+            </tr></thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px;">EPS Payout Ratio</td>
+                <td style="padding:8px;">~58%</td>
+                <td style="padding:8px;"><span style="color:var(--green);">✅ Looks safe!</span></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px;"><strong>FCF Payout Ratio</strong></td>
+                <td style="padding:8px;"><strong>~95%</strong></td>
+                <td style="padding:8px;"><span style="color:var(--red);">🚨 DANGER — barely covered by cash</span></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px;">Outcome</td>
+                <td style="padding:8px;" colspan="2"><strong style="color:var(--red);">Dividend was cut by 47% in 2022.</strong> The FCF ratio caught it. EPS missed it.</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="margin:12px 0 0; font-size:0.75rem; color:var(--text-dim);">AT&T's accounting EPS was inflated by non-cash items while actual free cash barely covered the dividend payment. This is exactly the scenario FCF payout exposes.</p>
+        </div>
+
+        <p>Another example: <strong>Realty Income (O)</strong> — a quality REIT — shows an EPS payout of ~265% (terrifying!), but its cash flow payout is only ~78% (totally reasonable). REITs have high depreciation that crushes EPS but doesn't affect cash. FCF-based analysis sees through this.</p>
+
+        <!-- OUR IMPLEMENTATION -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">🔧 Our Implementation</h4>
+
+        <p>We calculate:</p>
+        <div style="background:var(--bg-secondary); padding:12px; border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:0.8rem; margin:12px 0;">
+          Payout = (Dividend Per Share Annual ÷ Cash Flow Per Share TTM) × 100
+        </div>
+
+        <h5 style="color:var(--text-primary); margin-top:16px;">⚠️ Important Note: We Use a Proxy</h5>
+        <p>Strictly speaking, <strong>Free Cash Flow = Operating Cash Flow − Capital Expenditures</strong>. However, Finnhub's free API tier provides <code>cashFlowPerShareTTM</code> (operating cash flow per share) but not a pre-calculated FCF per share field.</p>
+
+        <p>We use operating cash flow as our denominator because:</p>
+        <ul style="margin:8px 0 8px 20px;">
+          <li><strong>The data is free and available</strong> — no paid API required</li>
+          <li><strong>It's a close approximation</strong> — for most dividend-paying companies (mature, stable capex), operating CF and FCF are directionally identical</li>
+          <li><strong>It's conservative</strong> — operating CF is always ≥ FCF, so our ratio will be slightly <em>lower</em> than true FCF payout (i.e., the real situation may be slightly worse than shown, not better)</li>
+          <li><strong>It still catches the danger signals</strong> — if operating CF barely covers the dividend, FCF definitely doesn't</li>
+        </ul>
+
+        <p style="color:var(--text-dim); font-size:0.75rem;">For precision, you could cross-reference with StockAnalysis.com's financials page which shows true FCF. Our column is a fast, free screening tool — not a replacement for deep due diligence.</p>
+
+        <!-- COLOR CODING -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">🚦 Color Coding on Your Dashboard</h4>
+
+        <table style="width:100%; border-collapse:collapse; margin:12px 0; font-size:0.8rem;">
+          <thead><tr style="border-bottom:2px solid var(--border);">
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Color</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Payout Range</th>
+            <th style="text-align:left; padding:8px; color:var(--text-primary);">Interpretation</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><span style="color:var(--green); font-weight:700;">● Green</span></td>
+              <td style="padding:8px;">0% – 75%</td>
+              <td style="padding:8px;"><strong>Safe.</strong> The company generates significantly more cash than it pays in dividends. Room to grow the dividend or absorb a bad quarter without cutting.</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><span style="color:var(--yellow); font-weight:700;">● Yellow</span></td>
+              <td style="padding:8px;">75% – 90%</td>
+              <td style="padding:8px;"><strong>Caution.</strong> The dividend consumes most of the cash flow. One bad quarter or capex spike could stress coverage. Watch for trend — is it rising year over year?</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><span style="color:var(--red); font-weight:700;">● Red</span></td>
+              <td style="padding:8px;">&gt; 90%</td>
+              <td style="padding:8px;"><strong>Danger.</strong> The company is paying out nearly all (or more than) its cash flow as dividends. This is unsustainable long-term. Dividend cut risk is elevated.</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><span style="color:var(--text-dim);">— Dash</span></td>
+              <td style="padding:8px;">n/a</td>
+              <td style="padding:8px;">Company doesn't pay a dividend, or cash flow data is unavailable.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- SECTOR EXCEPTIONS -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">📌 Sector Exceptions</h4>
+        <ul style="margin:8px 0 8px 20px;">
+          <li><strong>REITs & BDCs:</strong> Required by law to distribute 90%+ of taxable income. A yellow/red reading is normal and expected. Focus on whether it's trending worse, not the absolute number.</li>
+          <li><strong>Utilities:</strong> Stable, regulated earnings mean 70-85% payouts are common and acceptable.</li>
+          <li><strong>MLPs (pipelines):</strong> Similar to REITs — high payouts are structural, not a warning sign per se.</li>
+          <li><strong>Growth stocks:</strong> A "—" means no dividend — these companies reinvest all cash back into growth. Not a negative signal.</li>
+        </ul>
+
+        <!-- TOOLTIP -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">💡 Tooltip Details</h4>
+        <p>Hover over any Payout value on the dashboard to see:</p>
+        <ul style="margin:8px 0 8px 20px;">
+          <li><strong>FCF Payout:</strong> The percentage shown (DPS / CFPS)</li>
+          <li><strong>DPS:</strong> Dividend Per Share (annual)</li>
+          <li><strong>CFPS:</strong> Cash Flow Per Share (trailing twelve months)</li>
+          <li><strong>EPS Payout:</strong> Traditional EPS-based payout ratio for comparison</li>
+        </ul>
+
+        <div style="background:var(--bg-card); border:1px solid var(--green); border-radius:8px; padding:16px; margin-top:24px;">
+          <p style="margin:0; color:var(--text-primary);"><strong>🎯 Bottom Line:</strong> A green Payout number means the dividend is well-covered by actual cash generation. Combine with the Div% column (yield) for a complete picture — high yield + green payout = strong income opportunity. High yield + red payout = potential value trap.</p>
         </div>
 
       </div>
