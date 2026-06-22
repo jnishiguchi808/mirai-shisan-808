@@ -912,6 +912,24 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
           cells[19].textContent = `$${Math.round(high)}`;
         }
       }
+      // Extract forward EPS consensus (for FV calculation)
+      // Structure: d[3] = annual stats with epsThis/epsNext indices
+      try {
+        const annStats = d[3];
+        if (annStats && annStats.epsThis !== undefined) {
+          const epsThisObj = d[annStats.epsThis];
+          if (epsThisObj && epsThisObj.this !== undefined) {
+            data._forwardEPS = d[epsThisObj.this];
+          }
+          // Also grab next year for growth calculation
+          if (annStats.epsNext !== undefined) {
+            const epsNextObj = d[annStats.epsNext];
+            if (epsNextObj && epsNextObj.this !== undefined) {
+              data._forwardEPSNext = d[epsNextObj.this];
+            }
+          }
+        }
+      } catch(e) { /* forward EPS extraction failed, will fall back to Finnhub */ }
     }
   }
 
@@ -968,9 +986,15 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
     cells[15].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
 
     // Fair Value (FV)
-    const eps = m.epsNormalizedAnnual;
+    const trailingEps = m.epsNormalizedAnnual;
     const epsGrowth = m.epsGrowthTTMYoy;
     const currentPrice = parseFloat(cells[2].textContent.replace('$',''));
+
+    // Prefer forward EPS consensus from StockAnalysis over trailing Finnhub EPS
+    const fwdEPS = data._forwardEPS;
+    const fwdEPSNext = data._forwardEPSNext;
+    const eps = (fwdEPS && fwdEPS > 0) ? fwdEPS : trailingEps;
+    const epsSource = (fwdEPS && fwdEPS > 0) ? 'Fwd' : 'TTM';
 
     if (isETF) {
       // ETFs: FV not applicable — arbitrage keeps price ≈ NAV
@@ -985,14 +1009,17 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
     } else if (eps && eps > 0) {
       let models = [];
       let tips = [];
-      // Growth estimate: prefer forward-implied growth (P/E ÷ forwardPEG) over trailing TTM
+      // Growth estimate: prefer forward EPS growth, then forward PEG-implied, then TTM
       const pe = m.peNormalizedAnnual;
       const fwdPEG = m.forwardPEG;
       let growthSource = 'TTM';
       let growthPct;
-      if (fwdPEG && fwdPEG > 0 && pe && pe > 0) {
-        growthPct = pe / fwdPEG; // implied forward growth %
+      if (fwdEPS && fwdEPS > 0 && fwdEPSNext && fwdEPSNext > 0) {
+        growthPct = ((fwdEPSNext - fwdEPS) / fwdEPS) * 100;
         growthSource = 'Fwd';
+      } else if (fwdPEG && fwdPEG > 0 && pe && pe > 0) {
+        growthPct = pe / fwdPEG;
+        growthSource = 'PEG';
       } else if (epsGrowth) {
         growthPct = epsGrowth;
       } else {
@@ -1019,7 +1046,7 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
         const blended = models.reduce((a, b) => a + b, 0) / models.length;
         const gap = ((blended - currentPrice) / currentPrice * 100).toFixed(0);
         const fvColor = blended > currentPrice * 1.1 ? 'var(--green)' : blended < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
-        const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [Growth: ${growthPct.toFixed(1)}% ${growthSource}]`;
+        const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [EPS: $${eps.toFixed(2)} ${epsSource}, Growth: ${growthPct.toFixed(1)}% ${growthSource}]`;
         cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
       }
     }
@@ -1434,7 +1461,7 @@ function renderFairValuePrimer(container) {
         <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">📈 DCF-Lite Explained</h4>
         <p>This is a simplified <strong>Discounted Cash Flow</strong> model — the same core methodology used by SimplyWallStreet, VectorVest, and professional equity analysts. Here's how it works:</p>
         <ol style="margin:12px 0 12px 20px;">
-          <li><strong>Take current EPS</strong> (normalized, trailing 12 months)</li>
+          <li><strong>Take EPS</strong> — prefer forward consensus EPS from StockAnalysis (analyst estimate for current fiscal year); fall back to trailing normalized EPS from Finnhub if unavailable</li>
           <li><strong>Grow it</strong> at the <strong>forward-implied growth rate</strong> when available (derived from Forward PEG: growth = P/E ÷ Forward PEG), or fall back to trailing EPS growth. Clamped between -20% and +50% to avoid absurd projections.</li>
           <li><strong>Discount each year's earnings</strong> back at 10% (a standard equity risk premium)</li>
           <li><strong>Add a terminal value</strong>: after year 5, assume perpetual growth at 3% (roughly GDP/inflation). The terminal value = Year 5 EPS × (1.03) / (0.10 - 0.03), discounted back 5 years.</li>
@@ -1481,9 +1508,15 @@ function renderFairValuePrimer(container) {
         <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:16px; margin:16px 0;">
           <p style="margin:0 0 8px 0; font-weight:600; color:var(--text-primary);">Priority Order:</p>
           <ol style="margin:0; padding-left:20px; font-size:0.85rem;">
-            <li><strong>Forward-implied growth</strong> (preferred): <code>P/E ÷ Forward PEG</code> — reflects analyst consensus expectations for future growth</li>
-            <li><strong>Trailing TTM EPS growth</strong> (fallback): Used when Forward PEG isn't available (smaller/less-covered stocks)</li>
-            <li><strong>8% default</strong>: Used when neither is available</li>
+            <li><strong>Forward EPS growth</strong> (best): <code>(nextYearEPS − thisYearEPS) / thisYearEPS</code> — when StockAnalysis provides both this-year and next-year consensus estimates</li>
+            <li><strong>Forward PEG-implied growth</strong> (good): <code>P/E ÷ Forward PEG</code> — reflects analyst consensus expectations for future growth</li>
+            <li><strong>Trailing TTM EPS growth</strong> (fallback): Used when neither forward source is available</li>
+            <li><strong>8% default</strong>: Used when no growth data exists</li>
+          </ol>
+          <p style="margin:8px 0 4px 0; font-weight:600; color:var(--text-primary);">EPS Base:</p>
+          <ol style="margin:0; padding-left:20px; font-size:0.85rem;">
+            <li><strong>Forward consensus EPS</strong> (preferred): Current fiscal year analyst estimate from StockAnalysis — forward-looking, reflects expected earnings</li>
+            <li><strong>Trailing normalized EPS</strong> (fallback): From Finnhub — backward-looking, may be distorted by one-time events</li>
           </ol>
         </div>
 
@@ -1602,8 +1635,8 @@ function renderFairValuePrimer(container) {
         <!-- LIMITATIONS -->
         <h4 style="color:var(--red); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">⚠️ Limitations & Caveats</h4>
         <ul style="margin:8px 0 8px 20px;">
-          <li><strong>Backward-looking growth estimates.</strong> We use trailing-twelve-month (TTM) EPS growth, not analyst consensus forward estimates. This means the model reflects <em>what happened</em>, not <em>what's expected</em>. A company that just had a blowout quarter will look cheap; one entering a downturn will look expensive.</li>
-          <li><strong>No free cash flow data.</strong> Professional DCFs use free cash flow (FCF), not EPS. EPS can be manipulated by accounting choices (depreciation, stock-based comp, one-time charges). Our model uses normalized EPS as the closest available proxy from Finnhub's free tier.</li>
+          <li><strong>Forward-looking but not perfect.</strong> We now use forward consensus EPS from StockAnalysis when available, plus forward-implied growth from Finnhub's Forward PEG. However, if StockAnalysis data fails to load for a ticker, we fall back to trailing EPS — which can undervalue stocks with temporarily depressed earnings (like UNH during a crisis) or asset-heavy companies where depreciation suppresses EPS below cash flow (like CHDN).</li>
+          <li><strong>EPS ≠ Free Cash Flow.</strong> Professional DCFs use free cash flow (FCF), not EPS. Companies with heavy depreciation/amortization (acquisitions, physical assets) will show lower EPS than actual cash generation. SimplyWallStreet uses FCF, which is why their estimates are sometimes higher than ours.</li>
           <li><strong>Single discount rate.</strong> We use a flat 10% discount rate for all stocks. In reality, a utility should use ~7% and a speculative biotech ~15%. This oversimplifies risk.</li>
           <li><strong>Growth rate clamping.</strong> We cap growth at +50% and floor it at -20%. This prevents absurd FV estimates but also means hyper-growth or deeply cyclical stocks won't be accurately modeled.</li>
           <li><strong>Limited sector-specific adjustments.</strong> We now handle BDCs and REITs with NAV-based FV (see above), but banks and utilities still use the generic models. Banks ideally use dividend discount models; utilities use regulated asset base valuation.</li>
