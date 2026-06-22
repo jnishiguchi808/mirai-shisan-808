@@ -1041,28 +1041,38 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
       } else {
         growthPct = 8; // default assumption
       }
+
+      // Two-tier model: Growth (P/E > 25) vs Value (P/E ≤ 25)
+      const isGrowthTier = pe && pe > 25;
+      const dcfYears = isGrowthTier ? 10 : 5;
+      const pegCap = isGrowthTier ? 60 : 40;
+      const modelTier = isGrowthTier ? 'Growth' : 'Value';
+      const discountRate = 0.10;
+      const termGrowth = 0.03;
+
       const g = Math.min(Math.max(growthPct / 100, -0.2), 0.5);
       let dcfSum = 0;
-      for (let yr = 1; yr <= 5; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1.10, yr);
-      const terminalEPS = eps * Math.pow(1 + g, 5) * (1 + 0.03);
-      const terminalVal = terminalEPS / (0.10 - 0.03);
-      const pvTerminal = terminalVal / Math.pow(1.10, 5);
+      for (let yr = 1; yr <= dcfYears; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1 + discountRate, yr);
+      const terminalEPS = eps * Math.pow(1 + g, dcfYears) * (1 + termGrowth);
+      const terminalVal = terminalEPS / (discountRate - termGrowth);
+      const pvTerminal = terminalVal / Math.pow(1 + discountRate, dcfYears);
       const dcfFV = dcfSum + pvTerminal;
-      if (dcfFV > 0 && dcfFV < currentPrice * 10) { models.push(dcfFV); tips.push(`DCF: $${dcfFV.toFixed(0)}`); }
-      if (bookVal && bookVal > 0) {
+      if (dcfFV > 0 && dcfFV < currentPrice * 10) { models.push(dcfFV); tips.push(`DCF(${dcfYears}yr): $${dcfFV.toFixed(0)}`); }
+      // Graham Number: only for Value tier — meaningless for asset-light growth stocks
+      if (!isGrowthTier && bookVal && bookVal > 0) {
         const graham = Math.sqrt(22.5 * eps * bookVal);
         if (graham > 0) { models.push(graham); tips.push(`Graham: $${graham.toFixed(0)}`); }
       }
       if (growthPct > 0) {
-        const fairPE = Math.min(growthPct, 40);
+        const fairPE = Math.min(growthPct, pegCap);
         const pegFV = fairPE * eps;
-        if (pegFV > 0) { models.push(pegFV); tips.push(`PEG: $${pegFV.toFixed(0)}`); }
+        if (pegFV > 0) { models.push(pegFV); tips.push(`PEG(${pegCap}x): $${pegFV.toFixed(0)}`); }
       }
       if (models.length > 0) {
         const blended = models.reduce((a, b) => a + b, 0) / models.length;
         const gap = ((blended - currentPrice) / currentPrice * 100).toFixed(0);
         const fvColor = blended > currentPrice * 1.1 ? 'var(--green)' : blended < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
-        const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [EPS: $${eps.toFixed(2)} ${epsSource}, Growth: ${growthPct.toFixed(1)}% ${growthSource}]`;
+        const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [${modelTier} Model | EPS: $${eps.toFixed(2)} ${epsSource} | Growth: ${growthPct.toFixed(1)}% ${growthSource}]`;
         cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
       }
     }
@@ -1465,13 +1475,56 @@ function renderFairValuePrimer(container) {
             <tr style="border-bottom:1px solid var(--border);">
               <td style="padding:8px;"><strong style="color:var(--yellow);">PEG Fair Value</strong></td>
               <td style="padding:8px;">Assigns a P/E ratio equal to the earnings growth rate (PEG=1 thesis)</td>
-              <td style="padding:8px; font-family:'IBM Plex Mono',monospace; font-size:0.7rem;">Fair P/E (capped at 40) × EPS</td>
+              <td style="padding:8px; font-family:'IBM Plex Mono',monospace; font-size:0.7rem;">Fair P/E (capped at 40 or 60) × EPS</td>
               <td style="padding:8px;">Growth companies where earnings growth is the primary driver</td>
             </tr>
           </tbody>
         </table>
 
-        <p>The final <strong>FV</strong> is a simple average of whichever models produce a valid result for that ticker. If only one model fires (e.g., no book value data for Graham), the FV is based on the remaining models.</p>
+        <p>The final <strong>FV</strong> is a simple average of whichever models produce a valid result for that ticker. The dashboard uses a <strong>two-tier system</strong> that adapts based on the stock's P/E ratio:</p>
+
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:16px; margin:16px 0;">
+          <p style="margin:0 0 12px 0; font-weight:600; color:var(--text-primary);">🏗️ Four-Tier Valuation Framework</p>
+          <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+            <tr style="background:var(--bg-secondary); border-bottom:1px solid var(--border);">
+              <th style="padding:8px; text-align:left;">Tier</th>
+              <th style="padding:8px; text-align:left;">Trigger</th>
+              <th style="padding:8px; text-align:left;">Models Used</th>
+              <th style="padding:8px; text-align:left;">DCF Horizon</th>
+              <th style="padding:8px; text-align:left;">PEG Cap</th>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong style="color:var(--green);">Growth</strong></td>
+              <td style="padding:8px;">P/E &gt; 25</td>
+              <td style="padding:8px;">DCF + PEG (no Graham)</td>
+              <td style="padding:8px;">10 years</td>
+              <td style="padding:8px;">60×</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong style="color:var(--cyan);">Value</strong></td>
+              <td style="padding:8px;">P/E ≤ 25</td>
+              <td style="padding:8px;">DCF + Graham + PEG</td>
+              <td style="padding:8px;">5 years</td>
+              <td style="padding:8px;">40×</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong style="color:var(--purple);">NAV-Based</strong></td>
+              <td style="padding:8px;">BDC / REIT ticker</td>
+              <td style="padding:8px;">Book Value (NAV)</td>
+              <td style="padding:8px;">—</td>
+              <td style="padding:8px;">—</td>
+            </tr>
+            <tr>
+              <td style="padding:8px;"><strong style="color:var(--text-secondary);">Suppressed</strong></td>
+              <td style="padding:8px;">ETF ticker</td>
+              <td style="padding:8px;">— (price ≈ NAV by arbitrage)</td>
+              <td style="padding:8px;">—</td>
+              <td style="padding:8px;">—</td>
+            </tr>
+          </table>
+        </div>
+
+        <p><strong>Why two tiers for stocks?</strong> Growth companies (P/E &gt; 25) are priced by the market for sustained multi-year expansion. The Graham Number — designed for asset-heavy value stocks — produces absurdly low estimates for asset-light tech (GOOGL, ISRG, NVDA) because their book value is tiny relative to their earning power. Extending the DCF to 10 years and raising the PEG cap to 60× better reflects the longer runway the market is pricing in. Value stocks (P/E ≤ 25) keep the conservative 3-model blend that works well for mature, asset-heavy businesses like banks, insurers, and consumer staples.</p>
 
         <!-- DCF DEEP DIVE -->
         <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">📈 DCF-Lite Explained</h4>
@@ -1480,7 +1533,7 @@ function renderFairValuePrimer(container) {
           <li><strong>Take EPS</strong> — prefer forward consensus EPS from StockAnalysis (analyst estimate for current fiscal year). If current year is ≤ 0 (turnaround case), use next fiscal year's consensus instead (labeled Fwd+1). Fall back to trailing normalized EPS from Finnhub as last resort. If all are ≤ 0, show N/A.</li>
           <li><strong>Grow it</strong> at the <strong>forward-implied growth rate</strong> when available (derived from Forward PEG: growth = P/E ÷ Forward PEG), or fall back to trailing EPS growth. Clamped between -20% and +50% to avoid absurd projections.</li>
           <li><strong>Discount each year's earnings</strong> back at 10% (a standard equity risk premium)</li>
-          <li><strong>Add a terminal value</strong>: after year 5, assume perpetual growth at 3% (roughly GDP/inflation). The terminal value = Year 5 EPS × (1.03) / (0.10 - 0.03), discounted back 5 years.</li>
+          <li><strong>Add a terminal value</strong>: after the projection period (<strong>10 years</strong> for Growth tier, <strong>5 years</strong> for Value tier), assume perpetual growth at 3% (roughly GDP/inflation). The terminal value = final year EPS × (1.03) / (0.10 - 0.03), discounted back.</li>
           <li><strong>Sum it all up</strong> = the stock's intrinsic value per share</li>
         </ol>
 
@@ -1513,7 +1566,7 @@ function renderFairValuePrimer(container) {
           <p style="margin:0; font-family:'IBM Plex Mono',monospace; font-size:0.9rem; color:var(--text-primary);">
             Fair Value = EPS Growth Rate (%) × EPS
           </p>
-          <p style="margin:8px 0 0; font-size:0.75rem; color:var(--text-dim);">Example: EPS=$5, growth=25% → Fair P/E=25 → FV = 25 × $5 = $125. Capped at 40× to avoid absurd valuations for hyper-growth names.</p>
+          <p style="margin:8px 0 0; font-size:0.75rem; color:var(--text-dim);">Example: EPS=$5, growth=25% → Fair P/E=25 → FV = 25 × $5 = $125. Capped at <strong>40×</strong> for Value tier (P/E ≤ 25) or <strong>60×</strong> for Growth tier (P/E &gt; 25) to avoid absurd valuations.</p>
         </div>
         <p>This only fires when growth is positive. For declining-earnings companies, only DCF and Graham are used.</p>
 
