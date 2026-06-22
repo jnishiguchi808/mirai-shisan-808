@@ -990,11 +990,19 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
     const epsGrowth = m.epsGrowthTTMYoy;
     const currentPrice = parseFloat(cells[2].textContent.replace('$',''));
 
-    // Prefer forward EPS consensus from StockAnalysis over trailing Finnhub EPS
+    // EPS selection cascade: forward this-year → forward next-year (turnaround) → trailing
     const fwdEPS = data._forwardEPS;
     const fwdEPSNext = data._forwardEPSNext;
-    const eps = (fwdEPS && fwdEPS > 0) ? fwdEPS : trailingEps;
-    const epsSource = (fwdEPS && fwdEPS > 0) ? 'Fwd' : 'TTM';
+    let eps, epsSource;
+    if (fwdEPS && fwdEPS > 0) {
+      eps = fwdEPS; epsSource = 'Fwd';
+    } else if (fwdEPSNext && fwdEPSNext > 0) {
+      eps = fwdEPSNext; epsSource = 'Fwd+1';
+    } else if (trailingEps && trailingEps > 0) {
+      eps = trailingEps; epsSource = 'TTM';
+    } else {
+      eps = null; epsSource = 'N/A';
+    }
 
     if (isETF) {
       // ETFs: FV not applicable — arbitrage keeps price ≈ NAV
@@ -1006,7 +1014,15 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
       const pb = (currentPrice / bookVal).toFixed(2);
       const tipText = `NAV-based: Book Value $${bookVal.toFixed(2)} | P/B: ${pb}x | ${gap > 0 ? '+' : ''}${gap}% vs price`;
       cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${bookVal.toFixed(0)}</span>`;
-    } else if (eps && eps > 0) {
+    } else if (!eps) {
+      // No usable EPS from any source — show N/A with explanation
+      const reasons = [];
+      if (fwdEPS !== undefined && fwdEPS !== null) reasons.push(`Fwd EPS: $${Number(fwdEPS).toFixed(2)}`);
+      if (fwdEPSNext !== undefined && fwdEPSNext !== null) reasons.push(`Fwd+1 EPS: $${Number(fwdEPSNext).toFixed(2)}`);
+      if (trailingEps !== undefined && trailingEps !== null) reasons.push(`TTM EPS: $${Number(trailingEps).toFixed(2)}`);
+      const tipText = `FV unavailable — all EPS sources are ≤ 0 or missing. ${reasons.length ? reasons.join(', ') : 'No EPS data found.'}. Earnings-based models cannot value pre-profit or loss-making companies.`;
+      cells[16].innerHTML = `<span style="color:var(--yellow);" title="${tipText}">N/A</span>`;
+    } else if (eps > 0) {
       let models = [];
       let tips = [];
       // Growth estimate: prefer forward EPS growth, then forward PEG-implied, then TTM
@@ -1461,7 +1477,7 @@ function renderFairValuePrimer(container) {
         <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">📈 DCF-Lite Explained</h4>
         <p>This is a simplified <strong>Discounted Cash Flow</strong> model — the same core methodology used by SimplyWallStreet, VectorVest, and professional equity analysts. Here's how it works:</p>
         <ol style="margin:12px 0 12px 20px;">
-          <li><strong>Take EPS</strong> — prefer forward consensus EPS from StockAnalysis (analyst estimate for current fiscal year); fall back to trailing normalized EPS from Finnhub if unavailable</li>
+          <li><strong>Take EPS</strong> — prefer forward consensus EPS from StockAnalysis (analyst estimate for current fiscal year). If current year is ≤ 0 (turnaround case), use next fiscal year's consensus instead (labeled Fwd+1). Fall back to trailing normalized EPS from Finnhub as last resort. If all are ≤ 0, show N/A.</li>
           <li><strong>Grow it</strong> at the <strong>forward-implied growth rate</strong> when available (derived from Forward PEG: growth = P/E ÷ Forward PEG), or fall back to trailing EPS growth. Clamped between -20% and +50% to avoid absurd projections.</li>
           <li><strong>Discount each year's earnings</strong> back at 10% (a standard equity risk premium)</li>
           <li><strong>Add a terminal value</strong>: after year 5, assume perpetual growth at 3% (roughly GDP/inflation). The terminal value = Year 5 EPS × (1.03) / (0.10 - 0.03), discounted back 5 years.</li>
@@ -1515,8 +1531,10 @@ function renderFairValuePrimer(container) {
           </ol>
           <p style="margin:8px 0 4px 0; font-weight:600; color:var(--text-primary);">EPS Base:</p>
           <ol style="margin:0; padding-left:20px; font-size:0.85rem;">
-            <li><strong>Forward consensus EPS</strong> (preferred): Current fiscal year analyst estimate from StockAnalysis — forward-looking, reflects expected earnings</li>
-            <li><strong>Trailing normalized EPS</strong> (fallback): From Finnhub — backward-looking, may be distorted by one-time events</li>
+            <li><strong>Forward consensus EPS (this year)</strong> (preferred): Current fiscal year analyst estimate from StockAnalysis — forward-looking, reflects expected earnings</li>
+            <li><strong>Forward consensus EPS (next year)</strong> (turnaround fallback): If this year's EPS is negative or zero (e.g., Boeing during recovery), we use next fiscal year's consensus. This captures companies where analysts expect a return to profitability. Labeled <code>[Fwd+1]</code> in tooltips.</li>
+            <li><strong>Trailing normalized EPS</strong> (last resort): From Finnhub — backward-looking, may be distorted by one-time events</li>
+            <li><strong style="color:var(--yellow);">N/A</strong> (no usable EPS): If all three sources are ≤ 0 or missing, FV shows "N/A" in yellow. Hover for details on which EPS values were found. This typically affects pre-profit companies or turnarounds where even next-year consensus is negative.</li>
           </ol>
         </div>
 
@@ -1642,7 +1660,7 @@ function renderFairValuePrimer(container) {
           <li><strong>Limited sector-specific adjustments.</strong> We now handle BDCs and REITs with NAV-based FV (see above), but banks and utilities still use the generic models. Banks ideally use dividend discount models; utilities use regulated asset base valuation.</li>
           <li><strong>Graham Number undervalues tech.</strong> Asset-light companies (SaaS, platforms) have low book value, making Graham systematically conservative. This is a feature, not a bug — but it pulls the blended FV down for tech names.</li>
           <li><strong>Not a substitute for VectorVest or SimplyWallStreet.</strong> Those platforms use proprietary models with forward earnings consensus, sector-relative comparisons, and institutional data feeds we cannot access. Our FV is a <em>directional sanity check</em>, not a professional-grade valuation.</li>
-          <li><strong>Only works with positive EPS.</strong> Pre-profit companies (many in EV, biotech, fintech) will show no FV because earnings-based models are meaningless when EPS is negative.</li>
+          <li><strong>Turnaround stocks use next-year EPS.</strong> When current-year forward EPS is negative (e.g., BA, LCID), we fall back to next fiscal year's consensus estimate. This is labeled <code>[Fwd+1]</code> in tooltips. If even next-year EPS is ≤ 0, FV shows <strong style="color:var(--yellow);">N/A</strong> — meaning the stock cannot be valued with earnings-based models yet. Check analyst price targets as an alternative signal.</li>
         </ul>
 
         <!-- COMPARISON -->
@@ -1659,7 +1677,7 @@ function renderFairValuePrimer(container) {
               <td style="padding:8px;">Growth Input</td>
               <td style="padding:8px;">Proprietary forecast</td>
               <td style="padding:8px;">Analyst consensus (forward)</td>
-              <td style="padding:8px;">TTM EPS growth (backward)</td>
+              <td style="padding:8px;">Forward consensus EPS cascade (this year → next year → TTM)</td>
             </tr>
             <tr style="border-bottom:1px solid var(--border);">
               <td style="padding:8px;">Cash Flow</td>
