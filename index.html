@@ -1052,11 +1052,29 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
 
       const g = Math.min(Math.max(growthPct / 100, -0.2), 0.5);
       let dcfSum = 0;
-      for (let yr = 1; yr <= dcfYears; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1 + discountRate, yr);
-      const terminalEPS = eps * Math.pow(1 + g, dcfYears) * (1 + termGrowth);
-      const terminalVal = terminalEPS / (discountRate - termGrowth);
-      const pvTerminal = terminalVal / Math.pow(1 + discountRate, dcfYears);
-      const dcfFV = dcfSum + pvTerminal;
+      if (isGrowthTier) {
+        // Two-stage DCF: Stage 1 (yrs 1-5) full growth, Stage 2 (yrs 6-10) tapers to terminal
+        for (let yr = 1; yr <= 5; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1 + discountRate, yr);
+        let cumEPS = eps * Math.pow(1 + g, 5);
+        for (let yr = 6; yr <= 10; yr++) {
+          const fade = (10 - yr) / 5; // 0.8, 0.6, 0.4, 0.2, 0.0
+          const stageG = termGrowth + (g - termGrowth) * fade;
+          cumEPS *= (1 + stageG);
+          dcfSum += cumEPS / Math.pow(1 + discountRate, yr);
+        }
+        const terminalEPS = cumEPS * (1 + termGrowth);
+        const terminalVal = terminalEPS / (discountRate - termGrowth);
+        const pvTerminal = terminalVal / Math.pow(1 + discountRate, 10);
+        dcfSum += pvTerminal;
+      } else {
+        // Single-stage DCF: constant growth for 5 years
+        for (let yr = 1; yr <= 5; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1 + discountRate, yr);
+        const terminalEPS = eps * Math.pow(1 + g, 5) * (1 + termGrowth);
+        const terminalVal = terminalEPS / (discountRate - termGrowth);
+        const pvTerminal = terminalVal / Math.pow(1 + discountRate, 5);
+        dcfSum += pvTerminal;
+      }
+      const dcfFV = dcfSum;
       if (dcfFV > 0 && dcfFV < currentPrice * 10) { models.push(dcfFV); tips.push(`DCF(${dcfYears}yr): $${dcfFV.toFixed(0)}`); }
       // Graham Number: only for Value tier — meaningless for asset-light growth stocks
       if (!isGrowthTier && bookVal && bookVal > 0) {
@@ -1528,12 +1546,28 @@ function renderFairValuePrimer(container) {
 
         <!-- DCF DEEP DIVE -->
         <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">📈 DCF-Lite Explained</h4>
-        <p>This is a simplified <strong>Discounted Cash Flow</strong> model — the same core methodology used by SimplyWallStreet, VectorVest, and professional equity analysts. Here's how it works:</p>
+        <p>This is a simplified <strong>Discounted Cash Flow</strong> model — the same core methodology used by SimplyWallStreet, VectorVest, and professional equity analysts. The Growth tier uses a <strong>two-stage</strong> approach (like the pros) while Value tier uses a simpler single-stage.</p>
+
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:16px; margin:16px 0;">
+          <p style="margin:0 0 8px 0; font-weight:600; color:var(--green);">Growth Tier — Two-Stage DCF (10 years)</p>
+          <ol style="margin:0 0 12px 0; padding-left:20px; font-size:0.85rem;">
+            <li><strong>Stage 1 (Years 1–5):</strong> Full forward growth rate (capped at 50%)</li>
+            <li><strong>Stage 2 (Years 6–10):</strong> Growth linearly tapers from forward rate → 3% terminal. Year 6 = 80% of growth, Year 7 = 60%, Year 8 = 40%, Year 9 = 20%, Year 10 = terminal rate.</li>
+            <li><strong>Terminal value:</strong> After year 10, perpetual growth at 3%</li>
+          </ol>
+          <p style="margin:0 0 8px 0; font-weight:600; color:var(--cyan);">Value Tier — Single-Stage DCF (5 years)</p>
+          <ol style="margin:0; padding-left:20px; font-size:0.85rem;">
+            <li>Constant growth rate for all 5 years (capped at 50%)</li>
+            <li>Terminal value after year 5, perpetual growth at 3%</li>
+          </ol>
+        </div>
+
+        <p><strong>Why two-stage?</strong> No company sustains 40% growth for a decade. Even NVDA, GOOGL, and AMZN see growth moderate as they scale. The taper ensures high-growth stocks get credit for their runway without producing absurd valuations (a constant 40% for 10 years = 28.9× EPS multiplier — unrealistic for any company).</p>
+
+        <p>Both tiers use:</p>
         <ol style="margin:12px 0 12px 20px;">
           <li><strong>Take EPS</strong> — prefer forward consensus EPS from StockAnalysis (analyst estimate for current fiscal year). If current year is ≤ 0 (turnaround case), use next fiscal year's consensus instead (labeled Fwd+1). Fall back to trailing normalized EPS from Finnhub as last resort. If all are ≤ 0, show N/A.</li>
-          <li><strong>Grow it</strong> at the <strong>forward-implied growth rate</strong> when available (derived from Forward PEG: growth = P/E ÷ Forward PEG), or fall back to trailing EPS growth. Clamped between -20% and +50% to avoid absurd projections.</li>
           <li><strong>Discount each year's earnings</strong> back at 10% (a standard equity risk premium)</li>
-          <li><strong>Add a terminal value</strong>: after the projection period (<strong>10 years</strong> for Growth tier, <strong>5 years</strong> for Value tier), assume perpetual growth at 3% (roughly GDP/inflation). The terminal value = final year EPS × (1.03) / (0.10 - 0.03), discounted back.</li>
           <li><strong>Sum it all up</strong> = the stock's intrinsic value per share</li>
         </ol>
 
