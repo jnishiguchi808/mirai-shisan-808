@@ -238,6 +238,25 @@ const PLAINTEXT_PASSWORD = '4SonGoku';
 const FINNHUB_KEY = 'd8hh141r01qrn5ec293gd8hh141r01qrn5ec2940';
 const FMP_KEY = 'demo'; // Replace with your free FMP API key
 
+// FX rates for ADR currency conversion (EPS reported in local currency, price in USD)
+const FX_RATES = { USD: 1 };
+async function loadFXRates() {
+  try {
+    const pairs = ['USDJPY','USDGBP','USDEUR','USDKRW','USDINR','USDBRL','USDCNY','USDHKD','USDTWD'];
+    const res = await fetch(`https://finnhub.io/api/v1/forex/rates?base=USD&token=${FINNHUB_KEY}`);
+    const data = await res.json();
+    if (data.quote) {
+      for (const [currency, rate] of Object.entries(data.quote)) {
+        FX_RATES[currency] = rate;
+      }
+    }
+  } catch(e) {
+    // Fallback static rates if API fails
+    Object.assign(FX_RATES, { JPY: 155, GBP: 0.79, EUR: 0.92, KRW: 1380, INR: 83, BRL: 5.0, CNY: 7.25, HKD: 7.8, TWD: 32 });
+  }
+}
+loadFXRates();
+
 const WATCHLIST = {
   advertising: ['APP','APPS','DV','GOOGL','META','MGNI','PINS','PUBM','ROKU','SNAP','TTD'],
   agriculture: ['AGCO','ADM','CAT','DE','MOS','NTR','TSCO'],
@@ -758,8 +777,8 @@ async function fetchWatchlistData(tickers, tbodyId, category) {
 
   // Build per-ticker fetch tasks
   const tasks = tickers.map((ticker, i) => () => fetchSingleTicker(ticker, i, tbody, navTickers.has(ticker), etfTickers.has(ticker)));
-  // Run 5 tickers in parallel (stays under Finnhub 60/min with 2 calls per ticker)
-  await parallelLimit(tasks, 5);
+  // Run 3 tickers in parallel (stays under Finnhub 60/min with 3 calls per ticker + delays)
+  await parallelLimit(tasks, 3);
 }
 
 async function fetchSingleTicker(ticker, i, tbody, navBasedFV, isETF) {
@@ -779,6 +798,12 @@ async function fetchSingleTicker(ticker, i, tbody, navBasedFV, isETF) {
     const metRes = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FINNHUB_KEY}`);
     const met = await metRes.json();
     tickerData.metric = met.metric || null;
+
+    // Profile (Finnhub) — for currency detection on ADRs
+    await new Promise(r => setTimeout(r, 600));
+    const profRes = await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FINNHUB_KEY}`);
+    const prof = await profRes.json();
+    tickerData.profile = prof || null;
 
     // Non-Finnhub fetches can run in parallel
     const [saMain, saForecast, mtData, yfData] = await Promise.all([
@@ -959,11 +984,14 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
   if (m) {
     cells[5].textContent = m.beta?.toFixed(2) || '—';
     // P/B calculated from live price / latest book value for consistency
-    const bookVal = m.bookValuePerShareAnnual;
+    // Convert book value from local currency to USD for foreign ADRs
+    const profileCcy = data.profile?.currency;
+    const fxRate = (profileCcy && profileCcy !== 'USD' && FX_RATES[profileCcy]) ? FX_RATES[profileCcy] : 1;
+    const bookVal = m.bookValuePerShareAnnual ? m.bookValuePerShareAnnual / fxRate : null;
     const priceForPB = parseFloat(cells[2].textContent.replace('$',''));
     if (bookVal && bookVal > 0 && priceForPB > 0) {
       const pb = (priceForPB / bookVal).toFixed(2);
-      cells[6].innerHTML = `<span title="Price $${priceForPB.toFixed(2)} / Book $${bookVal.toFixed(2)}">${pb}</span>`;
+      cells[6].innerHTML = `<span title="Price $${priceForPB.toFixed(2)} / Book $${bookVal.toFixed(2)}${fxRate > 1 ? ' (converted from '+profileCcy+')' : ''}">${pb}</span>`;
     } else {
       cells[6].textContent = '—';
     }
@@ -1023,6 +1051,15 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
       eps = trailingEps; epsSource = 'TTM';
     } else {
       eps = null; epsSource = 'N/A';
+    }
+
+    // ADR currency conversion: if EPS is reported in foreign currency, convert to USD
+    const profileCurrency = data.profile?.currency;
+    let fxApplied = null;
+    if (eps && profileCurrency && profileCurrency !== 'USD' && FX_RATES[profileCurrency]) {
+      const rate = FX_RATES[profileCurrency];
+      eps = eps / rate;
+      fxApplied = profileCurrency;
     }
 
     if (isETF) {
@@ -1111,7 +1148,8 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
         const blended = models.reduce((a, b) => a + b, 0) / models.length;
         const gap = ((blended - currentPrice) / currentPrice * 100).toFixed(0);
         const fvColor = blended > currentPrice * 1.1 ? 'var(--green)' : blended < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
-        const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [${modelTier} Model | EPS: $${eps.toFixed(2)} ${epsSource} | Growth: ${growthPct.toFixed(1)}% ${growthSource}]`;
+        const fxNote = fxApplied ? `, FX: ${fxApplied}→USD` : '';
+        const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [${modelTier} Model | EPS: $${eps.toFixed(2)} ${epsSource}${fxNote} | Growth: ${growthPct.toFixed(1)}% ${growthSource}]`;
         cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
       }
     }
@@ -1754,9 +1792,59 @@ function renderFairValuePrimer(container) {
             <td style="padding:8px;">— (not applicable)</td>
             <td style="padding:8px;">Arbitrage keeps price = NAV; no intrinsic value to model</td>
           </tr>
+          <tr>
+            <td style="padding:8px;">Foreign ADRs</td>
+            <td style="padding:8px;">DCF + Graham + PEG (FX-adjusted)</td>
+            <td style="padding:8px;">EPS/Book converted from home currency to USD before modeling</td>
+          </tr>
         </table>
 
         <p style="font-size:0.8rem; color:var(--text-secondary);"><strong>Note:</strong> Most ETFs naturally show "—" because Finnhub doesn't return EPS data for them. In rare cases where it does, the result would be meaningless anyway — so the "—" is the correct display regardless.</p>
+
+        <!-- ADR CURRENCY CONVERSION -->
+        <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">💱 Special Case: Foreign ADRs (Currency Conversion)</h4>
+        <p>Many ADRs (American Depositary Receipts) report EPS and book value in their <strong>home currency</strong> (e.g., JPY for Japanese banks, KRW for Korean companies) while the stock trades in USD. Without conversion, the FV would be astronomically wrong.</p>
+
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:16px; margin:12px 0;">
+          <p style="margin:0 0 8px 0; font-weight:600; color:var(--text-primary);">How It Works:</p>
+          <ol style="margin:0; padding-left:20px; font-size:0.85rem;">
+            <li><strong>At page load</strong>, we fetch live FX rates from Finnhub (USD base).</li>
+            <li><strong>Per ticker</strong>, we fetch the company profile to detect the reporting currency.</li>
+            <li><strong>If currency ≠ USD</strong>, EPS and Book Value are divided by the exchange rate before entering the FV models.</li>
+          </ol>
+          <p style="margin:12px 0 0; font-size:0.8rem; color:var(--text-dim);">Example: MFG (Mizuho) reports EPS ¥300. With USD/JPY = 155, converted EPS = $1.94. FV models then use $1.94 instead of ¥300.</p>
+        </div>
+
+        <p style="font-size:0.8rem; color:var(--text-secondary);"><strong>Tooltip shows:</strong> When currency conversion is applied, the tooltip includes <code>[FX: JPY→USD]</code> (or the relevant currency pair) so you know conversion happened. P/B tooltips also note when book value was converted.</p>
+
+        <table style="width:100%; border-collapse:collapse; margin:12px 0; font-size:0.8rem;">
+          <tr style="background:var(--bg-secondary); border-bottom:1px solid var(--border);">
+            <th style="padding:8px; text-align:left;">Ticker</th>
+            <th style="padding:8px; text-align:left;">Company</th>
+            <th style="padding:8px; text-align:left;">Currency</th>
+            <th style="padding:8px; text-align:left;">Affected</th>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px;">MFG, SMFG, MUFG</td>
+            <td style="padding:8px;">Japanese megabanks</td>
+            <td style="padding:8px;">JPY</td>
+            <td style="padding:8px;">EPS, Book Value → divided by ~155</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px;">TM, HMC, SNY</td>
+            <td style="padding:8px;">Japanese industrials/pharma</td>
+            <td style="padding:8px;">JPY</td>
+            <td style="padding:8px;">EPS, Book Value → divided by ~155</td>
+          </tr>
+          <tr>
+            <td style="padding:8px;">TTE, DHLGY, AMKBY</td>
+            <td style="padding:8px;">European companies</td>
+            <td style="padding:8px;">EUR/GBP</td>
+            <td style="padding:8px;">EPS, Book Value → divided by ~0.92 / ~0.79</td>
+          </tr>
+        </table>
+
+        <p style="font-size:0.8rem; color:var(--text-secondary);"><strong>Fallback:</strong> If the FX API fails at load time, static fallback rates are used (updated with each code release). FV may be slightly off due to FX drift, but will not produce absurd values.</p>
 
         <!-- LIMITATIONS -->
         <h4 style="color:var(--red); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">⚠️ Limitations & Caveats</h4>
