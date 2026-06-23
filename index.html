@@ -184,6 +184,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="gambling" style="padding-left:28px;">Gambling</a>
     <a href="#" data-view="banking" style="padding-left:28px;">Banking</a>
     <a href="#" data-view="advertising" style="padding-left:28px;">Advertising</a>
+    <a href="#" data-view="alcohol_tobacco" style="padding-left:28px;">Alcohol+Tobacco</a>
     <a href="#" data-view="insurance" style="padding-left:28px;">Insurance</a>
     <a href="#" data-view="logistics" style="padding-left:28px;">Logistics</a>
     <a href="#" data-view="medical" style="padding-left:28px;">Medical</a>
@@ -258,6 +259,7 @@ const WATCHLIST = {
   gambling: ['BYD','CHDN','CZR','DKNG','FLUT','MCRI','MGM','MLCO','RRR','VICI','WYNN'],
   banking: ['BAC','BNS','C','CPF','GS','JPM','KBE','KRE','MFG','MS','MUFG','PNC','SMFG','TD','USB','WFC'],
   advertising: ['APP','APPS','DV','GOOGL','META','MGNI','PINS','PUBM','ROKU','SNAP','TTD'],
+  alcohol_tobacco: ['BF.B','BTI','BUD','DEO','JAPAY','MO','PM','SAM','STZ','TAP'],
   insurance: ['AFL','LMND','MET','SIGI','UNH','UNM','UPST'],
   fidelity: ['FBCG','FBCV','FBOT','FBUF','FCLD','FCOM','FCPI','FDBC','FDCF','FDEM','FDIF','FDIG','FDIS','FDLO','FDMO','FDRR','FDRV','FDTX','FDVV','FEAC','FELC','FELG','FELV','FEMR','FENI','FESM','FFDI','FFEM','FFGX','FFLC','FFLG','FFLV','FFSM','FHLC','FIDI','FIDU','FIVA','FLRG','FMAG','FMDE','FMET','FNCL','FPRO','FQAL','FRNW','FSEV','FSMD','FTEC','FVAL','ONEQ'],
   vanguard: ['IVOG','IVOO','IVOV','MGC','MGK','MGV','VB','VBK','VBR','VCR','VEA','VEU','VEXC','VFMF','VFMO','VFQY','VGK','VGT','VIG','VIOG','VIOO','VIOV','VIS','VNQ','VO','VOE','VONE','VONG','VONV','VOO','VOOG','VOOV','VOT','VOX','VPL','VSGX','VSS','VT','VTHR','VTI','VTV','VTWG','VTWO','VTWV','VUG','VV','VWO','VXF','VXUS','VYM']
@@ -417,6 +419,7 @@ function loadView(view) {
     case 'gambling': renderWatchlist(main, 'gambling', 'Gambling Watchlist'); break;
     case 'banking': renderWatchlist(main, 'banking', 'Banking Watchlist'); break;
     case 'advertising': renderWatchlist(main, 'advertising', 'Advertising Watchlist'); break;
+    case 'alcohol_tobacco': renderWatchlist(main, 'alcohol_tobacco', 'Alcohol+Tobacco Watchlist'); break;
     case 'insurance': renderWatchlist(main, 'insurance', 'Insurance Watchlist'); break;
     case 'vanguard': renderWatchlist(main, 'vanguard', 'ETF (Vanguard) Watchlist'); break;
     case 'fidelity': renderWatchlist(main, 'fidelity', 'ETF (Fidelity) Watchlist'); break;
