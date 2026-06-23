@@ -777,8 +777,8 @@ async function fetchWatchlistData(tickers, tbodyId, category) {
 
   // Build per-ticker fetch tasks
   const tasks = tickers.map((ticker, i) => () => fetchSingleTicker(ticker, i, tbody, navTickers.has(ticker), etfTickers.has(ticker)));
-  // Run 3 tickers in parallel (stays under Finnhub 60/min with 3 calls per ticker + delays)
-  await parallelLimit(tasks, 3);
+  // Run 5 tickers in parallel (2 sequential Finnhub calls per ticker; profile runs in parallel with non-Finnhub fetches)
+  await parallelLimit(tasks, 5);
 }
 
 async function fetchSingleTicker(ticker, i, tbody, navBasedFV, isETF) {
@@ -799,23 +799,22 @@ async function fetchSingleTicker(ticker, i, tbody, navBasedFV, isETF) {
     const met = await metRes.json();
     tickerData.metric = met.metric || null;
 
-    // Profile (Finnhub) — for currency detection on ADRs
-    await new Promise(r => setTimeout(r, 600));
-    const profRes = await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FINNHUB_KEY}`);
-    const prof = await profRes.json();
-    tickerData.profile = prof || null;
-
-    // Non-Finnhub fetches can run in parallel
-    const [saMain, saForecast, mtData, yfData] = await Promise.all([
+    // Non-Finnhub fetches + profile (Finnhub, with delay) run in parallel
+    const [saMain, saForecast, mtData, yfData, prof] = await Promise.all([
       fetchSAMain(ticker),
       fetchSAForecast(ticker),
       fetchMacrotrends(ticker),
-      fetchYahooSignal(ticker)
+      fetchYahooSignal(ticker),
+      new Promise(r => setTimeout(r, 600)).then(() =>
+        fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FINNHUB_KEY}`)
+          .then(r => r.json()).catch(() => null)
+      )
     ]);
     tickerData.saMain = saMain;
     tickerData.saForecast = saForecast;
     tickerData.macrotrends = mtData;
     tickerData.yahoo = yfData;
+    tickerData.profile = prof || null;
 
     // Cache the result
     cacheSet(ticker, tickerData);
