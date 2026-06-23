@@ -185,6 +185,8 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="banking" style="padding-left:28px;">Banking</a>
     <a href="#" data-view="advertising" style="padding-left:28px;">Advertising</a>
     <a href="#" data-view="alcohol_tobacco" style="padding-left:28px;">Alcohol+Tobacco</a>
+    <a href="#" data-view="housing" style="padding-left:28px;">Housing</a>
+    <a href="#" data-view="infrastructure" style="padding-left:28px;">Infrastructure</a>
     <a href="#" data-view="insurance" style="padding-left:28px;">Insurance</a>
     <a href="#" data-view="logistics" style="padding-left:28px;">Logistics</a>
     <a href="#" data-view="medical" style="padding-left:28px;">Medical</a>
@@ -236,7 +238,7 @@ const FMP_KEY = 'demo'; // Replace with your free FMP API key
 
 const WATCHLIST = {
   equities: ['ABBV','ABT','AMDY','AMT','APPN','APPS','BA','BN','CCI','CPB','CRM','DKNG','DUOL','DVN','GAIN','GEV','GOOGL','IIPR','IRM','MAIN','MCD','META','MSFT','NVDA','O','ONON','PATH','PLD','PLTY','QS','RIOT','SNY','SPGI','STAG','TOST','USBPRQ','VICI','VST','XYZ','ZS'],
-  etfs: ['BUG','CGDV','COPX','DGRO','GDXY','GPIQ','IBIT','IDVO','ISPY','JEPQ','JPIE','KBE','KRE','MLPA','NVDY','SCHD','SOXQ','SPMO','SPYI','SPYM','TSLY','TSMY','VIG','VNQI','VWO','XLF','XLG'],
+  etfs: ['BUG','CGDV','COPX','DGRO','GDXY','GPIQ','IBIT','IDVO','ISPY','JEPQ','JPIE','KBE','KRE','MLPA','NAIL','NVDY','SCHD','SOXQ','SPMO','SPYI','SPYM','TSLY','TSMY','VIG','VNQI','VWO','XLF','XLG'],
   semiconductors: ['AMAT','AMD','AMKR','ASML','COHR','CRUS','GFS','INTC','KLIC','LRCX','LSCC','MRVL','MU','NVDA','SLAB','SWKS','TSM','TXN','UMC','WOLF'],
   retail: ['AMZN','COST','CPNG','CROX','DDS','DIS','EBAY','ETSY','HAS','JMIA','KIM','KSS','LULU','MELI','NKE','O','SKT','SPG','TGT','WMT'],
   staples: ['CL','CLX','CPB','GIS','K','KHC','KMB','KO','MDLZ','PEP','PG','SJM'],
@@ -247,7 +249,7 @@ const WATCHLIST = {
   defense: ['AXON','BA','GD','HII','ITA','KTOS','LHX','LMT','NOC','PLTR','PPA','RTX','TDG'],
   etf_sp500: ['BALI','CGDV','GPIQ','ISPY','SPMO','SPY','SPYI','SPYM','VOO','XLG'],
   etf_russell: ['VONE','VONG','VONV','VTWO'],
-  reit: ['ADC','AGNC','AMT','CCI','CUBE','DLR','DOC','DX','EPR','GOOD','IIPR','IRM','KIM','NLY','O','OHI','PLD','RHP','STAG','VICI','VTR','WPC'],
+  reit: ['ADC','AGNC','AMT','CCI','CUBE','DLR','DOC','DX','EPR','GOOD','IIPR','IRM','KIM','NLY','NSA','O','OHI','PLD','RHP','STAG','VICI','VTR','WPC'],
   bdc: ['ARCC','BXSL','GAIN','GLAD','HRZN','HTGC','MAIN','OBDC','TSLX'],
   rawmaterials: ['ALB','B','BHP','CLF','COPX','FCX','GDX','GLD','IAU','LAC','LIT','NGLOY','NUE','RIO','SCCO','SLV','SQM','STLD'],
   medical: ['ABBV','ABT','ARKG','BMY','BSX','CVS','DXCM','FLGT','GDRX','GH','GILD','HIMS','ISRG','JNJ','LGND','LLY','MRK','MRNA','OPRX','PFE','SNY','TAK','TMDX','TMO','UNH','VCEL'],
@@ -260,6 +262,8 @@ const WATCHLIST = {
   banking: ['BAC','BNS','C','CPF','GS','JPM','KBE','KRE','MFG','MS','MUFG','PNC','SCHW','SMFG','TD','USB','WFC'],
   advertising: ['APP','APPS','DV','GOOGL','META','MGNI','PINS','PUBM','ROKU','SNAP','TTD'],
   alcohol_tobacco: ['BTI','BUD','DEO','JAPAY','MO','PM','SAM','STZ','TAP'],
+  housing: ['CARR','DHI','HD','LEN','LPX','NAIL','OPEN','TREX','WHR','Z'],
+  infrastructure: ['BIP','BIPC','WM'],
   insurance: ['AFL','LMND','MET','PRU','SIGI','UNH','UNM','UPST'],
   fidelity: ['FBCG','FBCV','FBOT','FBUF','FCLD','FCOM','FCPI','FDBC','FDCF','FDEM','FDIF','FDIG','FDIS','FDLO','FDMO','FDRR','FDRV','FDTX','FDVV','FEAC','FELC','FELG','FELV','FEMR','FENI','FESM','FFDI','FFEM','FFGX','FFLC','FFLG','FFLV','FFSM','FHLC','FIDI','FIDU','FIVA','FLRG','FMAG','FMDE','FMET','FNCL','FPRO','FQAL','FRNW','FSEV','FSMD','FTEC','FVAL','ONEQ'],
   vanguard: ['IVOG','IVOO','IVOV','MGC','MGK','MGV','VB','VBK','VBR','VCR','VEA','VEU','VEXC','VFMF','VFMO','VFQY','VGK','VGT','VIG','VIOG','VIOO','VIOV','VIS','VNQ','VO','VOE','VONE','VONG','VONV','VOO','VOOG','VOOV','VOT','VOX','VPL','VSGX','VSS','VT','VTHR','VTI','VTV','VTWG','VTWO','VTWV','VUG','VV','VWO','VXF','VXUS','VYM']
@@ -420,6 +424,8 @@ function loadView(view) {
     case 'banking': renderWatchlist(main, 'banking', 'Banking Watchlist'); break;
     case 'advertising': renderWatchlist(main, 'advertising', 'Advertising Watchlist'); break;
     case 'alcohol_tobacco': renderWatchlist(main, 'alcohol_tobacco', 'Alcohol+Tobacco Watchlist'); break;
+    case 'housing': renderWatchlist(main, 'housing', 'Housing Watchlist'); break;
+    case 'infrastructure': renderWatchlist(main, 'infrastructure', 'Infrastructure Watchlist'); break;
     case 'insurance': renderWatchlist(main, 'insurance', 'Insurance Watchlist'); break;
     case 'vanguard': renderWatchlist(main, 'vanguard', 'ETF (Vanguard) Watchlist'); break;
     case 'fidelity': renderWatchlist(main, 'fidelity', 'ETF (Fidelity) Watchlist'); break;
