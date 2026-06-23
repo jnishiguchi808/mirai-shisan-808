@@ -183,6 +183,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="fintech" style="padding-left:28px;">Fintech</a>
     <a href="#" data-view="gambling" style="padding-left:28px;">Gambling</a>
     <a href="#" data-view="banking" style="padding-left:28px;">Banking</a>
+    <a href="#" data-view="advertising" style="padding-left:28px;">Advertising</a>
     <a href="#" data-view="insurance" style="padding-left:28px;">Insurance</a>
     <a href="#" data-view="logistics" style="padding-left:28px;">Logistics</a>
     <a href="#" data-view="medical" style="padding-left:28px;">Medical</a>
@@ -236,11 +237,11 @@ const WATCHLIST = {
   equities: ['ABBV','ABT','AMDY','AMT','APPN','APPS','BA','BN','CCI','CPB','CRM','DKNG','DUOL','DVN','GAIN','GEV','GOOGL','IIPR','IRM','MAIN','MCD','META','MSFT','NVDA','O','ONON','PATH','PLD','PLTY','QS','RIOT','SNY','SPGI','STAG','TOST','USBPRQ','VICI','VST','XYZ','ZS'],
   etfs: ['BUG','CGDV','COPX','DGRO','GDXY','GPIQ','IBIT','IDVO','ISPY','JEPQ','JPIE','KBE','KRE','MLPA','NVDY','SCHD','SOXQ','SPMO','SPYI','SPYM','TSLY','TSMY','VIG','VNQI','VWO','XLF','XLG'],
   semiconductors: ['AMAT','AMD','AMKR','ASML','COHR','CRUS','GFS','INTC','KLIC','LRCX','LSCC','MRVL','MU','NVDA','SLAB','SWKS','TSM','TXN','UMC','WOLF'],
-  retail: ['AMZN','COST','CPNG','CROX','DDS','DIS','EBAY','HAS','JMIA','KIM','KSS','LULU','MELI','NKE','O','SKT','SPG','TGT','WMT'],
+  retail: ['AMZN','COST','CPNG','CROX','DDS','DIS','EBAY','ETSY','HAS','JMIA','KIM','KSS','LULU','MELI','NKE','O','SKT','SPG','TGT','WMT'],
   staples: ['CLX','CPB','PG'],
   travel: ['AAL','ABNB','ALK','BA','CCL','DAL','H','MAR','UAL'],
   logistics: ['AMKBY','CHRW','DAC','DHLGY','FDX','GNK','GSL','MATX','RXO','SBLK','UNP','UPS','XPO','ZIM'],
-  fintech: ['AFRM','APPS','ARKF','AXP','CBOE','COIN','INTU','MA','MQ','NU','PAGS','PAYC','PSFE','PYPL','SE','SHOP','SNOW','STNE','TIGR','UPST','V','XYZ'],
+  fintech: ['AFRM','APPS','ARKF','AXP','CBOE','COIN','FVRR','INTU','MA','MQ','NU','PAGS','PAYC','PSFE','PYPL','SE','SHOP','SNOW','STNE','TIGR','UPST','V','XYZ'],
   ev: ['F','GM','LCID','NIO','TM','TSLA','VFS','XPEV'],
   defense: ['AXON','BA','GD','HII','ITA','KTOS','LHX','LMT','NOC','PLTR','PPA','RTX','TDG'],
   etf_sp500: ['BALI','CGDV','GPIQ','ISPY','SPMO','SPY','SPYI','SPYM','VOO','XLG'],
@@ -256,6 +257,7 @@ const WATCHLIST = {
   etf_yieldmax: ['ABNY','AMDY','APLY','CONY','FBY','GDXY','GOOY','MRNY','NFLY','NVDY','OARK','PLTY','PYPY','SMCY','TSLY','ULTY','XOMO','XYZY','YBIT','YMAG'],
   gambling: ['BYD','CHDN','CZR','DKNG','FLUT','MCRI','MGM','MLCO','RRR','VICI','WYNN'],
   banking: ['BAC','BNS','C','CPF','GS','JPM','KBE','KRE','MFG','MS','MUFG','PNC','SMFG','TD','USB','WFC'],
+  advertising: ['APP','APPS','DV','GOOGL','META','MGNI','PINS','PUBM','ROKU','SNAP','TTD'],
   insurance: ['AFL','LMND','MET','SIGI','UNH','UNM','UPST'],
   fidelity: ['FBCG','FBCV','FBOT','FBUF','FCLD','FCOM','FCPI','FDBC','FDCF','FDEM','FDIF','FDIG','FDIS','FDLO','FDMO','FDRR','FDRV','FDTX','FDVV','FEAC','FELC','FELG','FELV','FEMR','FENI','FESM','FFDI','FFEM','FFGX','FFLC','FFLG','FFLV','FFSM','FHLC','FIDI','FIDU','FIVA','FLRG','FMAG','FMDE','FMET','FNCL','FPRO','FQAL','FRNW','FSEV','FSMD','FTEC','FVAL','ONEQ'],
   vanguard: ['IVOG','IVOO','IVOV','MGC','MGK','MGV','VB','VBK','VBR','VCR','VEA','VEU','VEXC','VFMF','VFMO','VFQY','VGK','VGT','VIG','VIOG','VIOO','VIOV','VIS','VNQ','VO','VOE','VONE','VONG','VONV','VOO','VOOG','VOOV','VOT','VOX','VPL','VSGX','VSS','VT','VTHR','VTI','VTV','VTWG','VTWO','VTWV','VUG','VV','VWO','VXF','VXUS','VYM']
@@ -414,6 +416,7 @@ function loadView(view) {
     case 'energy-new': renderWatchlist(main, 'energy_new', 'Energy (New) Watchlist'); break;
     case 'gambling': renderWatchlist(main, 'gambling', 'Gambling Watchlist'); break;
     case 'banking': renderWatchlist(main, 'banking', 'Banking Watchlist'); break;
+    case 'advertising': renderWatchlist(main, 'advertising', 'Advertising Watchlist'); break;
     case 'insurance': renderWatchlist(main, 'insurance', 'Insurance Watchlist'); break;
     case 'vanguard': renderWatchlist(main, 'vanguard', 'ETF (Vanguard) Watchlist'); break;
     case 'fidelity': renderWatchlist(main, 'fidelity', 'ETF (Fidelity) Watchlist'); break;
