@@ -294,6 +294,14 @@ const WATCHLIST = {
   vanguard: ['IVOG','IVOO','IVOV','MGC','MGK','MGV','VB','VBK','VBR','VCR','VEA','VEU','VEXC','VFMF','VFMO','VFQY','VGK','VGT','VIG','VIOG','VIOO','VIOV','VIS','VNQ','VNQI','VO','VOE','VONE','VONG','VONV','VOO','VOOG','VOOV','VOT','VOX','VPL','VSGX','VSS','VT','VTHR','VTI','VTV','VTWG','VTWO','VTWV','VUG','VV','VWO','VXF','VXUS','VYM']
 };
 
+// ETF tickers — SA link uses the /etf/ path (not /stocks/) and the FV column is suppressed for these
+const ETF_TICKERS = new Set([
+  ...(WATCHLIST.etfs || []), ...(WATCHLIST.etf_sp500 || []), ...(WATCHLIST.etf_russell || []),
+  ...(WATCHLIST.etf_yieldmax || []), ...(WATCHLIST.fidelity || []), ...(WATCHLIST.vanguard || []),
+  ...(WATCHLIST.etf_statestreet || [])
+]);
+function saPath(t) { return ETF_TICKERS.has(t) ? 'etf' : 'stocks'; }
+
 const QUICK_TICKERS = ['NVDA','MSFT','META','GOOGL','AMD','TSM','AAPL','AMZN'];
 
 // ============================================
@@ -722,7 +730,7 @@ function renderWatchlist(container, category, title) {
               <tr>
                 <td class="ticker-cell" onclick="loadStockView('${t}')">${t}</td>
                 <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
-                <td><a href="https://stockanalysis.com/stocks/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://www.macrotrends.net/stocks/charts/${t}/x/stock-price-history" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">MT</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
+                <td><a href="https://stockanalysis.com/${saPath(t)}/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://www.macrotrends.net/stocks/charts/${t}/x/stock-price-history" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">MT</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
               </tr>
             `).join('')}
           </tbody>
@@ -772,12 +780,8 @@ async function fetchWatchlistData(tickers, tbodyId, category) {
   // Build a set of BDC/REIT tickers for per-ticker NAV-based FV detection
   const navTickers = new Set([...(WATCHLIST.bdc || []), ...(WATCHLIST.reit || [])]);
 
-  // Build a set of ETF tickers — FV is suppressed for these (per-ticker, not per-watchlist)
-  const etfTickers = new Set([
-    ...(WATCHLIST.etfs || []), ...(WATCHLIST.etf_sp500 || []), ...(WATCHLIST.etf_russell || []),
-    ...(WATCHLIST.etf_yieldmax || []), ...(WATCHLIST.fidelity || []), ...(WATCHLIST.vanguard || []),
-    ...(WATCHLIST.etf_statestreet || [])
-  ]);
+  // ETF tickers — FV is suppressed for these (per-ticker, not per-watchlist); uses global ETF_TICKERS
+  const etfTickers = ETF_TICKERS;
 
   // Build per-ticker fetch tasks
   const tasks = tickers.map((ticker, i) => () => fetchSingleTicker(ticker, i, tbody, navTickers.has(ticker), etfTickers.has(ticker)));
