@@ -182,6 +182,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="fidelity" style="padding-left:28px;">ETF (Fidelity)</a>
     <a href="#" data-view="etf-russell" style="padding-left:28px;">ETF (Russell)</a>
     <a href="#" data-view="etf-sp500" style="padding-left:28px;">ETF (S&amp;P)</a>
+    <a href="#" data-view="etf-statestreet" style="padding-left:28px;">ETF (StateStreet)</a>
     <a href="#" data-view="vanguard" style="padding-left:28px;">ETF (Vanguard)</a>
     <a href="#" data-view="etf-yieldmax" style="padding-left:28px;">ETF (Yieldmax)</a>
     <a href="#" data-view="ev" style="padding-left:28px;">EV</a>
@@ -271,6 +272,7 @@ const WATCHLIST = {
   equities: [],
   etf_russell: ['VONE','VONG','VONV','VTWO'],
   etf_sp500: ['BALI','CGDV','DGRO','GPIQ','IDVO','ISPY','JEPQ','JPIE','SCHD','SPMO','SPY','SPYI','SPYM','VFLO','VOO','XLG'],
+  etf_statestreet: ['DIA','GLD','MDY','SPY','XLB','XLC','XLE','XLF','XLI','XLK','XLP','XLRE','XLU','XLV','XLY'],
   etf_yieldmax: ['ABNY','AMDY','APLY','CONY','FBY','GDXY','GOOY','MRNY','NFLY','NVDY','OARK','PLTY','PYPY','SMCY','TSLY','TSMY','ULTY','XOMO','XYZY','YBIT','YMAG'],
   etfs: ['AIQ','ARKF','ARKG','BOTZ','BUG','CIBR','COPX','GDX','GLD','IAU','IBIT','ICLN','ITA','KBE','KRE','LIT','MLPA','MLPI','NAIL','PPA','ROBT','SLV','SOXQ','XLF'],
   ev: ['F','GM','LCID','NIO','TM','TSLA','VFS','XPEV'],
@@ -435,6 +437,7 @@ function loadView(view) {
     case 'energy-old': renderWatchlist(main, 'energy_old', 'Energy (Old) Watchlist'); break;
     case 'etf-russell': renderWatchlist(main, 'etf_russell', 'ETF (Russell) Watchlist'); break;
     case 'etf-sp500': renderWatchlist(main, 'etf_sp500', 'ETF (S&P) Watchlist'); break;
+    case 'etf-statestreet': renderWatchlist(main, 'etf_statestreet', 'ETF (StateStreet) Watchlist'); break;
     case 'etf-yieldmax': renderWatchlist(main, 'etf_yieldmax', 'ETF (Yieldmax) Watchlist'); break;
     case 'etfs': renderWatchlist(main, 'etfs', 'ETFs & Closed End Funds'); break;
     case 'ev': renderWatchlist(main, 'ev', 'EV Watchlist'); break;
@@ -772,7 +775,8 @@ async function fetchWatchlistData(tickers, tbodyId, category) {
   // Build a set of ETF tickers — FV is suppressed for these (per-ticker, not per-watchlist)
   const etfTickers = new Set([
     ...(WATCHLIST.etfs || []), ...(WATCHLIST.etf_sp500 || []), ...(WATCHLIST.etf_russell || []),
-    ...(WATCHLIST.etf_yieldmax || []), ...(WATCHLIST.fidelity || []), ...(WATCHLIST.vanguard || [])
+    ...(WATCHLIST.etf_yieldmax || []), ...(WATCHLIST.fidelity || []), ...(WATCHLIST.vanguard || []),
+    ...(WATCHLIST.etf_statestreet || [])
   ]);
 
   // Build per-ticker fetch tasks
