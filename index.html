@@ -97,6 +97,8 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
 .data-table { width:100%; border-collapse:collapse; font-family:'IBM Plex Mono',monospace; font-size:0.75rem; }
 .data-table th { text-align:left; padding:8px 10px; color:var(--text-dim); font-size:0.65rem; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border); font-weight:600; position:sticky; top:0; background:var(--bg-card); cursor:pointer; z-index:10; }
 .data-table th:hover { color:var(--text-primary); }
+.data-table th .sort-ind { font-size:0.6rem; margin-left:2px; color:var(--blue); }
+.data-table th.sorted { color:var(--text-primary); }
 .data-table td { padding:7px 10px; border-bottom:1px solid #1a2332; vertical-align:middle; }
 .data-table tr:hover td { background:var(--bg-secondary); }
 .data-table .ticker-cell { color:var(--blue); font-weight:600; cursor:pointer; }
@@ -701,33 +703,33 @@ function renderWatchlist(container, category, title) {
         <table class="data-table">
           <thead>
             <tr>
-              <th>Ticker</th>
-              <th>Sig</th>
-              <th>Price</th>
-              <th>Chg $</th>
-              <th>Chg %</th>
-              <th>Beta</th>
-              <th>P/B</th>
-              <th>P/E</th>
-              <th>5Y P/E</th>
-              <th>PEG</th>
-              <th>Div %</th>
-              <th>Payout</th>
-              <th>Ex-Div</th>
-              <th>Earnings</th>
-              <th>52W Hi</th>
-              <th>52W Lo</th>
-              <th>FV</th>
-              <th>Analyst Lo</th>
-              <th>Analyst Mid</th>
-              <th>Analyst Hi</th>
-              <th>Vol</th>
-              <th>Links</th>
+              <th onclick="sortWatchlist(this)">Ticker<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Sig<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Price<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Chg $<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Chg %<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Beta<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">P/B<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">P/E<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">5Y P/E<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">PEG<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Div %<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Payout<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Ex-Div<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Earnings<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">52W Hi<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">52W Lo<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">FV<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Analyst Lo<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Analyst Mid<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Analyst Hi<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">Vol<span class="sort-ind"></span></th>
+              <th style="cursor:default">Links</th>
             </tr>
           </thead>
           <tbody id="watchlist-body">
-            ${tickers.map(t => `
-              <tr>
+            ${tickers.map((t, i) => `
+              <tr data-idx="${i}">
                 <td class="ticker-cell" onclick="loadStockView('${t}')">${t}</td>
                 <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
                 <td><a href="https://stockanalysis.com/${saPath(t)}/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://www.macrotrends.net/stocks/charts/${t}/x/stock-price-history" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">MT</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
@@ -742,6 +744,57 @@ function renderWatchlist(container, category, title) {
 
   // Fetch data for all tickers (throttled)
   fetchWatchlistData(tickers, 'watchlist-body', category);
+}
+
+// --- Column sorting for watchlist tables ---
+// DOM-based: sorts whatever is currently rendered. Empty ("—") cells always sink to the bottom.
+function cellSortValue(cell, col) {
+  const t = (cell.textContent || '').trim();
+  if (t === '' || t === '—' || t === '-') return { e: 1 };
+  // Date columns: Ex-Div (12), Earnings (13) rendered as MM/DD/YY
+  if (col === 12 || col === 13) {
+    const m = t.match(/(\d{2})\/(\d{2})\/(\d{2})/);
+    if (m) return { n: new Date(2000 + (+m[3]), (+m[1]) - 1, +m[2]).getTime() };
+    return { e: 1 };
+  }
+  // Volume (20): 1.2M / 300K / 500
+  if (col === 20) {
+    const m = t.match(/([\d.]+)\s*([MK]?)/i);
+    if (m) { let v = parseFloat(m[1]); if (/m/i.test(m[2])) v *= 1e6; else if (/k/i.test(m[2])) v *= 1e3; return { n: v }; }
+    return { e: 1 };
+  }
+  // Ticker (0): alphabetical
+  if (col === 0) return { s: t.toLowerCase() };
+  // Everything else: strip $, %, +, commas → number; fall back to string
+  const num = parseFloat(t.replace(/[^0-9.\-]/g, ''));
+  if (!isNaN(num) && /[0-9]/.test(t)) return { n: num };
+  return { s: t.toLowerCase() };
+}
+
+function sortWatchlist(th) {
+  const table = th.closest('table');
+  if (!table) return;
+  const tbody = table.tBodies[0];
+  if (!tbody) return;
+  const ths = [...th.parentNode.children];
+  const col = ths.indexOf(th);
+  const dir = th.getAttribute('data-sort') === 'asc' ? 'desc' : 'asc';
+  ths.forEach(h => { h.removeAttribute('data-sort'); h.classList.remove('sorted'); const ind = h.querySelector('.sort-ind'); if (ind) ind.textContent = ''; });
+  th.setAttribute('data-sort', dir);
+  th.classList.add('sorted');
+  const ind = th.querySelector('.sort-ind'); if (ind) ind.textContent = dir === 'asc' ? ' ▲' : ' ▼';
+  const mul = dir === 'asc' ? 1 : -1;
+  const rows = [...tbody.rows];
+  rows.sort((ra, rb) => {
+    const a = cellSortValue(ra.cells[col], col), b = cellSortValue(rb.cells[col], col);
+    if (a.e && b.e) return 0;
+    if (a.e) return 1;   // empties always bottom, regardless of direction
+    if (b.e) return -1;
+    if ('n' in a && 'n' in b) return (a.n - b.n) * mul;
+    const sa = ('s' in a) ? a.s : String(a.n), sb = ('s' in b) ? b.s : String(b.n);
+    return (sa < sb ? -1 : sa > sb ? 1 : 0) * mul;
+  });
+  rows.forEach(r => tbody.appendChild(r));
 }
 
 // --- Cache utilities (localStorage, 15-min TTL) ---
@@ -833,7 +886,7 @@ async function fetchSingleTicker(ticker, i, tbody, navBasedFV, isETF) {
 
 async function fetchSAMain(ticker) {
   try {
-    const r = await fetch(`https://corsproxy.io/?https://stockanalysis.com/stocks/${ticker.toLowerCase()}/__data.json`);
+    const r = await fetch(`https://corsproxy.io/?https://stockanalysis.com/${saPath(ticker)}/${ticker.toLowerCase()}/__data.json`);
     if (r.ok) return await r.json();
   } catch(e) {}
   return null;
@@ -904,7 +957,7 @@ async function fetchYahooSignal(ticker) {
 }
 
 function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
-  const row = tbody.children[i];
+  const row = tbody.querySelector(`tr[data-idx="${i}"]`) || tbody.children[i];
   if (!row) return;
   const cells = row.cells;
 
@@ -931,7 +984,8 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
     if (d && d[0]) {
       const nameIdx = d[0].name;
       if (nameIdx !== undefined && d[nameIdx]) cells[0].title = d[nameIdx];
-      const exDivIdx = d[0].exDividendDate;
+      // Ex-Div: stock pages use `exDividendDate`, ETF pages use `exDivDate`
+      const exDivIdx = d[0].exDividendDate !== undefined ? d[0].exDividendDate : d[0].exDivDate;
       if (exDivIdx !== undefined && d[exDivIdx]) {
         const exDate = new Date(d[exDivIdx]);
         const exFmt = !isNaN(exDate) ? `${(exDate.getMonth()+1).toString().padStart(2,'0')}/${exDate.getDate().toString().padStart(2,'0')}/${exDate.getFullYear().toString().slice(-2)}` : d[exDivIdx];
@@ -941,6 +995,9 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
           if (daysUntil >= 0 && daysUntil <= 7) cells[12].innerHTML = `<span class="highlight-soon">${exFmt}</span>`;
         }
       }
+      // Div%: ETF pages expose a preformatted `dividendYield` (e.g. "3.22%"); stocks use Finnhub instead
+      const dyIdx = d[0].dividendYield;
+      if (dyIdx !== undefined && d[dyIdx]) cells[10].textContent = d[dyIdx];
       const edIdx = d[0].earningsDate;
       if (edIdx !== undefined && d[edIdx]) {
         const edDate = new Date(d[edIdx]);
@@ -1021,7 +1078,9 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
     } else {
       cells[9].textContent = '—';
     }
-    cells[10].textContent = m.dividendYieldIndicatedAnnual ? `${m.dividendYieldIndicatedAnnual.toFixed(2)}%` : '—';
+    // Div%: Finnhub for stocks; ETFs keep the StockAnalysis value set above
+    if (m.dividendYieldIndicatedAnnual) cells[10].textContent = `${m.dividendYieldIndicatedAnnual.toFixed(2)}%`;
+    else if (!isETF) cells[10].textContent = '—';
     // Payout Ratio (FCF-based)
     const dps = m.dividendPerShareAnnual;
     const cfps = m.cashFlowPerShareTTM;
