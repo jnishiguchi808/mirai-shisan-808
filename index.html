@@ -772,13 +772,18 @@ function cellSortValue(cell, col) {
 }
 
 function sortWatchlist(th) {
+  // User click: toggle direction (default asc), then apply
+  const dir = th.getAttribute('data-sort') === 'asc' ? 'desc' : 'asc';
+  applySort(th, dir);
+}
+
+function applySort(th, dir) {
   const table = th.closest('table');
   if (!table) return;
   const tbody = table.tBodies[0];
   if (!tbody) return;
   const ths = [...th.parentNode.children];
   const col = ths.indexOf(th);
-  const dir = th.getAttribute('data-sort') === 'asc' ? 'desc' : 'asc';
   ths.forEach(h => { h.removeAttribute('data-sort'); h.classList.remove('sorted'); const ind = h.querySelector('.sort-ind'); if (ind) ind.textContent = ''; });
   th.setAttribute('data-sort', dir);
   th.classList.add('sorted');
@@ -840,6 +845,11 @@ async function fetchWatchlistData(tickers, tbodyId, category) {
   const tasks = tickers.map((ticker, i) => () => fetchSingleTicker(ticker, i, tbody, navTickers.has(ticker), etfTickers.has(ticker)));
   // Run 5 tickers in parallel (2 sequential Finnhub calls per ticker; profile runs in parallel with non-Finnhub fetches)
   await parallelLimit(tasks, 5);
+
+  // If the user sorted while data was still loading, re-apply that sort once now
+  // that every row is populated, so late-arriving values land in the right order.
+  const sortedTh = tbody.closest('table')?.querySelector('th.sorted');
+  if (sortedTh) applySort(sortedTh, sortedTh.getAttribute('data-sort') || 'asc');
 }
 
 async function fetchSingleTicker(ticker, i, tbody, navBasedFV, isETF) {
