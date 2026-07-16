@@ -359,22 +359,34 @@ function getArchetype(ticker, isETF, industry) {
   if (ARCHETYPE_OVERRIDES[ticker]) return ARCHETYPE_OVERRIDES[ticker];
   return classifyByIndustry(industry);
 }
-// Banks / insurers: Fair P/B = (ROE − g) / (r − g); FV = Fair P/B × book value per share.
-// roePct is a percentage (e.g. 16.94 = 16.94%). Returns null if ROE ≤ g (no premium justified).
-function justifiedBookFV(roePct, bookVal, r = 0.10, g = 0.03) {
-  if (!roePct || !bookVal || bookVal <= 0) return null;
+// --- Fair-value tuning knobs for the book & yield archetypes (adjust here to taste) ---
+const BANK_COST_OF_EQUITY = 0.10;    // mid-cycle required return on bank equity (r)
+const BANK_TERMINAL_GROWTH = 0.04;   // long-run book-value growth (g)
+const DDM_COST_OF_EQUITY = 0.09;     // required return for utility/telecom/MLP equity (r)
+
+// Banks / insurers: Fair P/B = (ROE − g) / (r − g); FV = price × (Fair P/B ÷ actual P/B).
+// Using the P/B RATIO (not raw book value per share) makes this currency- and ADR-ratio-
+// invariant: Finnhub's pbAnnual is dimensionless and consistent with the USD ADR price, so
+// foreign listings (e.g. JPY book value with a USD ADR price — MUFG/MFG/SMFG) no longer blow up.
+// roePct is a percentage (16.94 = 16.94%). Returns null if ROE ≤ g (no premium justified).
+function justifiedBookFV(roePct, price, pbActual, r = BANK_COST_OF_EQUITY, g = BANK_TERMINAL_GROWTH) {
+  if (!roePct || !price || price <= 0 || !pbActual || pbActual <= 0) return null;
   const roe = roePct / 100;
   if (roe <= g) return null;
-  const fairPB = (roe - g) / (r - g);
-  return { fv: fairPB * bookVal, fairPB, roe };
+  let fairPB = (roe - g) / (r - g);
+  fairPB = Math.min(Math.max(fairPB, 0.3), 4);   // clamp against noisy ROE inputs
+  return { fv: price * (fairPB / pbActual), fairPB, roe, pbActual };
 }
-// Utilities / telecom / MLPs: Gordon growth dividend-discount. FV = DPS × (1+g) / (r − g).
-// g is clamped to a sane [2%, 5%] band because DDM is very sensitive to r − g.
-function gordonDDM(dps, gRaw, r = 0.09) {
-  if (!dps || dps <= 0) return null;
+// Utilities / telecom / MLPs: Gordon growth DDM. FV = D1/(r−g) = price × yield × (1+g)/(r−g).
+// Expressed via dividend YIELD (a ratio) rather than raw DPS so it is currency-invariant for
+// foreign ADRs (e.g. ENB/BCE report DPS in CAD but trade in USD). g clamped to [2%,5%] because
+// DDM is very sensitive to r − g. divYieldPct is a percentage (3.49 = 3.49%).
+function gordonDDM(divYieldPct, price, gRaw, r = DDM_COST_OF_EQUITY) {
+  if (!divYieldPct || divYieldPct <= 0 || !price || price <= 0) return null;
+  const y = divYieldPct / 100;
   const g = Math.min(Math.max(gRaw == null ? 0.04 : gRaw, 0.02), 0.05);
   if (r <= g) return null;
-  return { fv: (dps * (1 + g)) / (r - g), g, r };
+  return { fv: price * y * (1 + g) / (r - g), g, r, y };
 }
 
 const QUICK_TICKERS = ['NVDA','MSFT','META','GOOGL','AMD','TSM','AAPL','AMZN'];
@@ -1215,10 +1227,10 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
     // archetype-specific fair-value candidates (each is null unless it applies).
     const archetype = getArchetype(ticker, isETF, data.profile?.finnhubIndustry);
     const roeVal = m.roeTTM ?? m.roeRfy;
-    const bookFV = (archetype === 'book' && bookVal && bookVal > 0 && currentPrice > 0)
-      ? justifiedBookFV(roeVal, bookVal) : null;
+    const bookFV = (archetype === 'book' && currentPrice > 0)
+      ? justifiedBookFV(roeVal, currentPrice, m.pbAnnual) : null;
     const ddmFV = (archetype === 'yield' && currentPrice > 0)
-      ? gordonDDM(m.dividendPerShareAnnual, (epsGrowth != null ? epsGrowth / 100 : null)) : null;
+      ? gordonDDM(m.dividendYieldIndicatedAnnual, currentPrice, (epsGrowth != null ? epsGrowth / 100 : null)) : null;
 
     if (isETF) {
       // ETFs: FV not applicable — arbitrage keeps price ≈ NAV
@@ -1235,14 +1247,14 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
       const fv = bookFV.fv;
       const gap = ((fv - currentPrice) / currentPrice * 100).toFixed(0);
       const fvColor = fv > currentPrice * 1.1 ? 'var(--green)' : fv < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
-      const tipText = `Justified P/B ${bookFV.fairPB.toFixed(2)}x = (ROE ${(bookFV.roe * 100).toFixed(1)}% − g 3%) / (r 10% − g 3%), × Book $${bookVal.toFixed(0)} → $${fv.toFixed(0)} | ${gap > 0 ? '+' : ''}${gap}% vs price [Method: Book / ROE-justified P/B | Confidence: Medium]`;
+      const tipText = `Justified P/B ${bookFV.fairPB.toFixed(2)}x = (ROE ${(bookFV.roe * 100).toFixed(1)}% − g 4%) / (r 10% − g 4%); FV = price × (fair P/B ÷ actual P/B ${bookFV.pbActual.toFixed(2)}x) → $${fv.toFixed(0)} | ${gap > 0 ? '+' : ''}${gap}% vs price [Method: Book / ROE-justified P/B | Confidence: Medium]`;
       cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${fv.toFixed(0)}</span>`;
     } else if (ddmFV) {
       // Utilities / telecom / MLPs — Gordon dividend-discount model
       const fv = ddmFV.fv;
       const gap = ((fv - currentPrice) / currentPrice * 100).toFixed(0);
       const fvColor = fv > currentPrice * 1.1 ? 'var(--green)' : fv < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
-      const tipText = `Gordon DDM: DPS $${m.dividendPerShareAnnual.toFixed(2)} × (1+g) / (r − g), r ${(ddmFV.r * 100).toFixed(0)}%, g ${(ddmFV.g * 100).toFixed(0)}% → $${fv.toFixed(0)} | ${gap > 0 ? '+' : ''}${gap}% vs price [Method: Dividend-discount | Confidence: Medium]`;
+      const tipText = `Gordon DDM: yield ${(ddmFV.y * 100).toFixed(2)}% × (1+g) / (r − g), r ${(ddmFV.r * 100).toFixed(0)}%, g ${(ddmFV.g * 100).toFixed(0)}% → $${fv.toFixed(0)} | ${gap > 0 ? '+' : ''}${gap}% vs price [Method: Dividend-discount | Confidence: Medium]`;
       cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${fv.toFixed(0)}</span>`;
     } else if (!eps) {
       // No usable EPS from any source — show N/A with explanation
@@ -1769,13 +1781,13 @@ function renderFairValuePrimer(container) {
             <tr style="border-bottom:1px solid var(--border);">
               <td style="padding:8px;"><strong style="color:var(--yellow);">Book (ROE)</strong></td>
               <td style="padding:8px;">Banks, insurers</td>
-              <td style="padding:8px;">Justified P/B = (ROE − g) / (r − g), × book value</td>
+              <td style="padding:8px;">Justified P/B = (ROE − g)/(r − g); FV = price × (fair P/B ÷ actual P/B)</td>
               <td style="padding:8px;">Medium</td>
             </tr>
             <tr style="border-bottom:1px solid var(--border);">
               <td style="padding:8px;"><strong style="color:var(--green);">Yield (DDM)</strong></td>
               <td style="padding:8px;">Utilities, telecom, pipelines / MLPs</td>
-              <td style="padding:8px;">Gordon DDM: DPS × (1+g) / (r − g)</td>
+              <td style="padding:8px;">Gordon DDM: price × yield × (1+g)/(r − g)</td>
               <td style="padding:8px;">Medium</td>
             </tr>
             <tr style="border-bottom:1px solid var(--border);">
@@ -1796,9 +1808,9 @@ function renderFairValuePrimer(container) {
 
         <p><strong>Why archetypes instead of one model?</strong> Earnings-growth models (DCF / Graham / PEG) assume a company retains and compounds earnings — wrong for businesses whose value comes from assets (banks, REITs), dividends (utilities), or mid-cycle normalized earnings (commodities). Forcing them through the generic blend produced systematically low fair values — e.g. quality banks flagged "overvalued" purely because their growth rate is modest. Each archetype swaps in the lens practitioners actually use. Within <strong>Earnings</strong> we still split Growth (P/E &gt; 25) vs Value (P/E ≤ 25): the Graham Number is dropped for asset-light growth names (GOOGL, ISRG, NVDA) where tiny book value makes it absurdly low, and the DCF extends to 10 years to reflect the longer runway the market prices in. Value stocks keep the conservative 3-model blend that suits mature, asset-heavy businesses.</p>
 
-        <p><strong>Book (ROE) model — banks &amp; insurers.</strong> A bank that earns a 17% return on equity is worth well above book value; one earning 6% is worth less. Pure NAV (P/B = 1) is therefore wrong for banks. We use the justified price-to-book from the Gordon model: <strong>Fair P/B = (ROE − g) / (r − g)</strong>, with cost of equity r = 10% and long-run growth g = 3%, then FV = Fair P/B × book value per share. If ROE is missing or ≤ g, we fall back to the earnings blend.</p>
+        <p><strong>Book (ROE) model — banks &amp; insurers.</strong> A bank that earns a 17% return on equity is worth well above book value; one earning 6% is worth less. Pure NAV (P/B = 1) is therefore wrong for banks. We use the justified price-to-book from the Gordon model: <strong>Fair P/B = (ROE − g) / (r − g)</strong>, with cost of equity r = 10% and long-run book-value growth g = 4%. Rather than multiplying a raw book-value-per-share (which breaks for foreign ADRs whose book value is reported in local currency while the ADR trades in USD — e.g. the Japanese megabanks MUFG/MFG/SMFG), we apply the ratio to the live price: <strong>FV = price × (Fair P/B ÷ actual P/B)</strong>. Because both P/B figures are dimensionless, this is currency- and ADR-ratio-invariant. If ROE is missing or ≤ g, we fall back to the earnings blend.</p>
 
-        <p><strong>Yield (DDM) model — utilities, telecom, MLPs.</strong> For regulated, dividend-driven businesses, value is the present value of the dividend stream: <strong>FV = DPS × (1 + g) / (r − g)</strong> (Gordon growth), with r = 9% and g clamped to a 2–5% band. DDM is very sensitive to r − g, so these carry Medium confidence — treat the number as directional.</p>
+        <p><strong>Yield (DDM) model — utilities, telecom, MLPs.</strong> For regulated, dividend-driven businesses, value is the present value of the dividend stream: <strong>FV = price × dividend&nbsp;yield × (1 + g) / (r − g)</strong> (Gordon growth), with r = 9% and g clamped to a 2–5% band. Expressing it through the dividend <em>yield</em> (a ratio) rather than raw dividend-per-share keeps it currency-invariant for foreign ADRs (ENB, BCE, VOD…). DDM is very sensitive to r − g, so these carry Medium confidence — treat the number as directional.</p>
 
 
         <!-- DCF DEEP DIVE -->
