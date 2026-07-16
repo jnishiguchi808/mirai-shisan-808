@@ -304,6 +304,79 @@ const ETF_TICKERS = new Set([
 ]);
 function saPath(t) { return ETF_TICKERS.has(t) ? 'etf' : 'stocks'; }
 
+// ============================================================
+// VALUATION ARCHETYPE CLASSIFICATION + MODEL REGISTRY
+// Instead of special-casing every sector, each ticker is classified into ONE
+// valuation archetype, and each archetype maps to the fair-value model that fits
+// how that kind of business actually creates value:
+//   earnings → DCF + Graham + PEG blend   (default; operating companies)
+//   nav      → fair value = book value    (REITs, BDCs — pass-throughs at ~1x book)
+//   book     → ROE-justified P/B          (banks, insurers — earnings models understate)
+//   yield    → Gordon dividend-discount   (utilities, telecom, pipelines/MLPs)
+//   cyclical → earnings blend, FLAGGED    (energy, materials, autos, airlines)
+//   etf      → suppressed                 (price ≈ NAV by arbitrage)
+// Classification order: curated ticker overrides → Finnhub-industry heuristic →
+// earnings default. Overrides come first because industry labels are unreliable
+// (Goldman reports "Financial Services", Realty Income reports "Real Estate").
+// ============================================================
+const ARCHETYPE_OVERRIDES = (() => {
+  const map = {};
+  const tag = (list, type) => (list || []).forEach(t => { if (!(t in map)) map[t] = type; });
+  // Asset-value pass-throughs → pure NAV
+  tag(WATCHLIST.reit, 'nav');
+  tag(WATCHLIST.bdc, 'nav');
+  // Banks & brokers → ROE-justified P/B (ETFs in the list are caught by the isETF check first)
+  tag(WATCHLIST.banking, 'book');
+  // Traditional insurance carriers → book (managed-care/insurtech left as earnings)
+  tag(['AFL','MET','PRU','SIGI','UNM','ALL','TRV','CB','AIG','PGR','HIG','CINF','MFC','SLF','AIZ','GL','L'], 'book');
+  // Regulated utilities / renewables-yield
+  tag(['DUK','NEE','SO','D','AEP','EXC','XEL','ED','WEC','ES','PEG','DTE','PPL','CMS','AQN','HE','CEG','VST','GEV','BEPC','FE','AEE','LNT','NI','PNW','EIX','SRE'], 'yield');
+  // Midstream / pipelines / MLPs (income vehicles)
+  tag(['ET','KMI','OKE','WMB','EPD','MPLX','PAA','PBA','ENB','TRP','WES'], 'yield');
+  // Telecom
+  tag(['T','VZ','TMUS','BCE','TU','VOD','ORAN','TEF'], 'yield');
+  // Cyclical commodities — trailing EPS distorts earnings models
+  tag(['XOM','CVX','COP','OXY','DVN','FANG','HAL','SLB','PSX','PR','VNOM','TTE','MRO','APA','EOG','HES','LNG'], 'cyclical');
+  tag(WATCHLIST.rawmaterials, 'cyclical');
+  // Autos & airlines (deeply cyclical)
+  tag(['F','GM','STLA','TSLA','HMC','TM','VFS','RIVN','NIO','XPEV'], 'cyclical');
+  tag(['AAL','DAL','UAL','ALK','LUV'], 'cyclical');
+  return map;
+})();
+
+function classifyByIndustry(industry) {
+  if (!industry) return 'earnings';
+  const s = industry.toLowerCase();
+  if (s.includes('reit') || s.includes('real estate')) return 'nav';
+  if (s.includes('bank') || s.includes('insurance')) return 'book';
+  if (s.includes('utilit') || s.includes('telecom')) return 'yield';
+  if (s.includes('oil') || s.includes('gas') || s.includes('metals') || s.includes('mining') ||
+      s.includes('airline') || s.includes('automobile') || s.includes('auto manufacturer')) return 'cyclical';
+  return 'earnings';
+}
+function getArchetype(ticker, isETF, industry) {
+  if (isETF) return 'etf';
+  if (ARCHETYPE_OVERRIDES[ticker]) return ARCHETYPE_OVERRIDES[ticker];
+  return classifyByIndustry(industry);
+}
+// Banks / insurers: Fair P/B = (ROE − g) / (r − g); FV = Fair P/B × book value per share.
+// roePct is a percentage (e.g. 16.94 = 16.94%). Returns null if ROE ≤ g (no premium justified).
+function justifiedBookFV(roePct, bookVal, r = 0.10, g = 0.03) {
+  if (!roePct || !bookVal || bookVal <= 0) return null;
+  const roe = roePct / 100;
+  if (roe <= g) return null;
+  const fairPB = (roe - g) / (r - g);
+  return { fv: fairPB * bookVal, fairPB, roe };
+}
+// Utilities / telecom / MLPs: Gordon growth dividend-discount. FV = DPS × (1+g) / (r − g).
+// g is clamped to a sane [2%, 5%] band because DDM is very sensitive to r − g.
+function gordonDDM(dps, gRaw, r = 0.09) {
+  if (!dps || dps <= 0) return null;
+  const g = Math.min(Math.max(gRaw == null ? 0.04 : gRaw, 0.02), 0.05);
+  if (r <= g) return null;
+  return { fv: (dps * (1 + g)) / (r - g), g, r };
+}
+
 const QUICK_TICKERS = ['NVDA','MSFT','META','GOOGL','AMD','TSM','AAPL','AMZN'];
 
 // ============================================
@@ -1138,16 +1211,39 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
       fxApplied = profileCurrency;
     }
 
+    // Classify this ticker into a valuation archetype and pre-compute the
+    // archetype-specific fair-value candidates (each is null unless it applies).
+    const archetype = getArchetype(ticker, isETF, data.profile?.finnhubIndustry);
+    const roeVal = m.roeTTM ?? m.roeRfy;
+    const bookFV = (archetype === 'book' && bookVal && bookVal > 0 && currentPrice > 0)
+      ? justifiedBookFV(roeVal, bookVal) : null;
+    const ddmFV = (archetype === 'yield' && currentPrice > 0)
+      ? gordonDDM(m.dividendPerShareAnnual, (epsGrowth != null ? epsGrowth / 100 : null)) : null;
+
     if (isETF) {
       // ETFs: FV not applicable — arbitrage keeps price ≈ NAV
       cells[16].innerHTML = `<span style="color:var(--text-secondary);" title="FV not applicable for ETFs (price = NAV by design)">—</span>`;
-    } else if (navBasedFV && bookVal && bookVal > 0 && currentPrice > 0) {
+    } else if (archetype === 'nav' && bookVal && bookVal > 0 && currentPrice > 0) {
       // NAV-based FV for BDCs/REITs — fair value = book value (NAV)
       const gap = ((bookVal - currentPrice) / currentPrice * 100).toFixed(0);
       const fvColor = bookVal > currentPrice * 1.05 ? 'var(--green)' : bookVal < currentPrice * 0.95 ? 'var(--red)' : 'var(--text-primary)';
       const pb = (currentPrice / bookVal).toFixed(2);
-      const tipText = `NAV-based: Book Value $${bookVal.toFixed(2)} | P/B: ${pb}x | ${gap > 0 ? '+' : ''}${gap}% vs price`;
+      const tipText = `NAV-based: Book Value $${bookVal.toFixed(2)} | P/B: ${pb}x | ${gap > 0 ? '+' : ''}${gap}% vs price [Method: NAV / book value | Confidence: High]`;
       cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${bookVal.toFixed(0)}</span>`;
+    } else if (bookFV) {
+      // Banks / insurers — ROE-justified P/B (earnings-growth models understate financials)
+      const fv = bookFV.fv;
+      const gap = ((fv - currentPrice) / currentPrice * 100).toFixed(0);
+      const fvColor = fv > currentPrice * 1.1 ? 'var(--green)' : fv < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
+      const tipText = `Justified P/B ${bookFV.fairPB.toFixed(2)}x = (ROE ${(bookFV.roe * 100).toFixed(1)}% − g 3%) / (r 10% − g 3%), × Book $${bookVal.toFixed(0)} → $${fv.toFixed(0)} | ${gap > 0 ? '+' : ''}${gap}% vs price [Method: Book / ROE-justified P/B | Confidence: Medium]`;
+      cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${fv.toFixed(0)}</span>`;
+    } else if (ddmFV) {
+      // Utilities / telecom / MLPs — Gordon dividend-discount model
+      const fv = ddmFV.fv;
+      const gap = ((fv - currentPrice) / currentPrice * 100).toFixed(0);
+      const fvColor = fv > currentPrice * 1.1 ? 'var(--green)' : fv < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
+      const tipText = `Gordon DDM: DPS $${m.dividendPerShareAnnual.toFixed(2)} × (1+g) / (r − g), r ${(ddmFV.r * 100).toFixed(0)}%, g ${(ddmFV.g * 100).toFixed(0)}% → $${fv.toFixed(0)} | ${gap > 0 ? '+' : ''}${gap}% vs price [Method: Dividend-discount | Confidence: Medium]`;
+      cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${fv.toFixed(0)}</span>`;
     } else if (!eps) {
       // No usable EPS from any source — show N/A with explanation
       const reasons = [];
@@ -1223,9 +1319,16 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
       if (models.length > 0) {
         const blended = models.reduce((a, b) => a + b, 0) / models.length;
         const gap = ((blended - currentPrice) / currentPrice * 100).toFixed(0);
-        const fvColor = blended > currentPrice * 1.1 ? 'var(--green)' : blended < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
+        const isCyclical = archetype === 'cyclical';
+        let confidence = (epsSource === 'Fwd' && (growthSource === 'Fwd' || growthSource === 'PEG')) ? 'High'
+                         : (epsSource === 'Fwd+1' ? 'Low' : 'Medium');
+        if (isCyclical) confidence = 'Low';
+        const method = isCyclical ? 'Earnings blend — cyclical (unreliable)' : 'Earnings blend';
+        let fvColor = blended > currentPrice * 1.1 ? 'var(--green)' : blended < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
+        if (isCyclical) fvColor = 'var(--text-secondary)';
         const fxNote = fxApplied ? `, FX: ${fxApplied}→USD` : '';
-        const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [${modelTier} Model | EPS: $${eps.toFixed(2)} ${epsSource}${fxNote} | Growth: ${growthPct.toFixed(1)}% ${growthSource}]`;
+        const cycNote = isCyclical ? ' ⚠ Cyclical: trailing EPS distorts earnings models — treat as rough; use mid-cycle normalized EPS.' : '';
+        const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [${modelTier} Model | EPS: $${eps.toFixed(2)} ${epsSource}${fxNote} | Growth: ${growthPct.toFixed(1)}% ${growthSource} | Method: ${method} | Confidence: ${confidence}]${cycNote}`;
         cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
       }
     }
@@ -1582,7 +1685,7 @@ function renderFairValuePrimer(container) {
 
         <!-- WHAT IS IT -->
         <h4 style="color:var(--green); margin-top:24px; border-bottom:1px solid var(--border); padding-bottom:6px;">📐 What Is the FV Column?</h4>
-        <p>The FV column shows a <strong>blended fair value estimate</strong> derived from three independent valuation models. The number is color-coded:</p>
+        <p>The FV column shows a <strong>fair value estimate</strong> derived from a valuation model chosen by the stock's <em>archetype</em> (earnings, book, yield, NAV, or cyclical — see below). For most stocks this blends three independent models; specialized archetypes use a fitter model. The number is color-coded:</p>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:12px 0;">
           <div style="background:var(--bg-card); border-radius:8px; padding:12px; text-align:center;">
             <div style="font-size:1.2rem; color:var(--green);">$XXX</div>
@@ -1600,7 +1703,7 @@ function renderFairValuePrimer(container) {
             <p style="font-size:0.75rem; margin-top:4px;">FV is >10% below current price. Stock may be trading above its intrinsic worth.</p>
           </div>
         </div>
-        <p>Hover over the FV value to see the breakdown from each model and the percentage gap.</p>
+        <p>Hover over the FV value to see the model breakdown, the percentage gap, and the <strong>[Method | Confidence]</strong> tag.</p>
 
         <!-- THREE MODELS -->
         <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">🧮 The Three Models</h4>
@@ -1634,50 +1737,69 @@ function renderFairValuePrimer(container) {
           </tbody>
         </table>
 
-        <p>The final <strong>FV</strong> is a simple average of whichever models produce a valid result for that ticker. The dashboard uses a <strong>two-tier system</strong> that adapts based on the stock's P/E ratio:</p>
+        <p>The final <strong>FV</strong> is the average of whichever models are valid for that ticker. Rather than special-casing every sector, the dashboard classifies each ticker into one of a small set of <strong>valuation archetypes</strong>, and each archetype maps to the model that fits how that kind of business actually creates value. Classification uses curated ticker overrides first (industry labels are unreliable — Goldman reports as "Financial Services", Realty Income as "Real Estate"), then a Finnhub-industry heuristic, else the earnings default.</p>
 
         <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:16px; margin:16px 0;">
-          <p style="margin:0 0 12px 0; font-weight:600; color:var(--text-primary);">🏗️ Four-Tier Valuation Framework</p>
+          <p style="margin:0 0 12px 0; font-weight:600; color:var(--text-primary);">🏗️ Valuation Archetypes</p>
           <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
             <tr style="background:var(--bg-secondary); border-bottom:1px solid var(--border);">
-              <th style="padding:8px; text-align:left;">Tier</th>
-              <th style="padding:8px; text-align:left;">Trigger</th>
-              <th style="padding:8px; text-align:left;">Models Used</th>
-              <th style="padding:8px; text-align:left;">DCF Horizon</th>
-              <th style="padding:8px; text-align:left;">PEG Cap</th>
+              <th style="padding:8px; text-align:left;">Archetype</th>
+              <th style="padding:8px; text-align:left;">Applies To</th>
+              <th style="padding:8px; text-align:left;">Fair-Value Model</th>
+              <th style="padding:8px; text-align:left;">Confidence</th>
             </tr>
             <tr style="border-bottom:1px solid var(--border);">
-              <td style="padding:8px;"><strong style="color:var(--green);">Growth</strong></td>
-              <td style="padding:8px;">P/E &gt; 25</td>
-              <td style="padding:8px;">DCF + PEG (no Graham)</td>
-              <td style="padding:8px;">10 years</td>
-              <td style="padding:8px;">60×</td>
+              <td style="padding:8px;"><strong style="color:var(--green);">Earnings — Growth</strong></td>
+              <td style="padding:8px;">Operating companies, P/E &gt; 25</td>
+              <td style="padding:8px;">DCF (10yr, 2-stage) + PEG (60× cap). No Graham.</td>
+              <td style="padding:8px;">High / Med</td>
             </tr>
             <tr style="border-bottom:1px solid var(--border);">
-              <td style="padding:8px;"><strong style="color:var(--cyan);">Value</strong></td>
-              <td style="padding:8px;">P/E ≤ 25</td>
-              <td style="padding:8px;">DCF + Graham + PEG</td>
-              <td style="padding:8px;">5 years</td>
-              <td style="padding:8px;">40×</td>
+              <td style="padding:8px;"><strong style="color:var(--blue);">Earnings — Value</strong></td>
+              <td style="padding:8px;">Operating companies, P/E ≤ 25</td>
+              <td style="padding:8px;">DCF (5yr) + Graham + PEG (40× cap)</td>
+              <td style="padding:8px;">High / Med</td>
             </tr>
             <tr style="border-bottom:1px solid var(--border);">
-              <td style="padding:8px;"><strong style="color:var(--purple);">NAV-Based</strong></td>
-              <td style="padding:8px;">BDC / REIT ticker</td>
-              <td style="padding:8px;">Book Value (NAV)</td>
-              <td style="padding:8px;">—</td>
-              <td style="padding:8px;">—</td>
+              <td style="padding:8px;"><strong style="color:var(--purple);">NAV</strong></td>
+              <td style="padding:8px;">REITs, BDCs</td>
+              <td style="padding:8px;">Fair value = book value (price ≈ NAV for pass-throughs)</td>
+              <td style="padding:8px;">High</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong style="color:var(--yellow);">Book (ROE)</strong></td>
+              <td style="padding:8px;">Banks, insurers</td>
+              <td style="padding:8px;">Justified P/B = (ROE − g) / (r − g), × book value</td>
+              <td style="padding:8px;">Medium</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong style="color:var(--green);">Yield (DDM)</strong></td>
+              <td style="padding:8px;">Utilities, telecom, pipelines / MLPs</td>
+              <td style="padding:8px;">Gordon DDM: DPS × (1+g) / (r − g)</td>
+              <td style="padding:8px;">Medium</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong style="color:var(--red);">Cyclical</strong></td>
+              <td style="padding:8px;">Energy, materials, autos, airlines</td>
+              <td style="padding:8px;">Earnings blend, shown muted &amp; flagged (trailing EPS distorts models)</td>
+              <td style="padding:8px;">Low</td>
             </tr>
             <tr>
-              <td style="padding:8px;"><strong style="color:var(--text-secondary);">Suppressed</strong></td>
-              <td style="padding:8px;">ETF ticker</td>
-              <td style="padding:8px;">— (price ≈ NAV by arbitrage)</td>
-              <td style="padding:8px;">—</td>
+              <td style="padding:8px;"><strong style="color:var(--text-secondary);">ETF / Fund</strong></td>
+              <td style="padding:8px;">ETFs, mutual funds</td>
+              <td style="padding:8px;">Suppressed — price ≈ NAV by arbitrage</td>
               <td style="padding:8px;">—</td>
             </tr>
           </table>
+          <p style="margin:12px 0 0; font-size:0.75rem; color:var(--text-dim);">Every FV tooltip ends with <strong>[Method: … | Confidence: …]</strong> so you can see which archetype/model produced the number and how much to trust it.</p>
         </div>
 
-        <p><strong>Why two tiers for stocks?</strong> Growth companies (P/E &gt; 25) are priced by the market for sustained multi-year expansion. The Graham Number — designed for asset-heavy value stocks — produces absurdly low estimates for asset-light tech (GOOGL, ISRG, NVDA) because their book value is tiny relative to their earning power. Extending the DCF to 10 years and raising the PEG cap to 60× better reflects the longer runway the market is pricing in. Value stocks (P/E ≤ 25) keep the conservative 3-model blend that works well for mature, asset-heavy businesses like banks, insurers, and consumer staples.</p>
+        <p><strong>Why archetypes instead of one model?</strong> Earnings-growth models (DCF / Graham / PEG) assume a company retains and compounds earnings — wrong for businesses whose value comes from assets (banks, REITs), dividends (utilities), or mid-cycle normalized earnings (commodities). Forcing them through the generic blend produced systematically low fair values — e.g. quality banks flagged "overvalued" purely because their growth rate is modest. Each archetype swaps in the lens practitioners actually use. Within <strong>Earnings</strong> we still split Growth (P/E &gt; 25) vs Value (P/E ≤ 25): the Graham Number is dropped for asset-light growth names (GOOGL, ISRG, NVDA) where tiny book value makes it absurdly low, and the DCF extends to 10 years to reflect the longer runway the market prices in. Value stocks keep the conservative 3-model blend that suits mature, asset-heavy businesses.</p>
+
+        <p><strong>Book (ROE) model — banks &amp; insurers.</strong> A bank that earns a 17% return on equity is worth well above book value; one earning 6% is worth less. Pure NAV (P/B = 1) is therefore wrong for banks. We use the justified price-to-book from the Gordon model: <strong>Fair P/B = (ROE − g) / (r − g)</strong>, with cost of equity r = 10% and long-run growth g = 3%, then FV = Fair P/B × book value per share. If ROE is missing or ≤ g, we fall back to the earnings blend.</p>
+
+        <p><strong>Yield (DDM) model — utilities, telecom, MLPs.</strong> For regulated, dividend-driven businesses, value is the present value of the dividend stream: <strong>FV = DPS × (1 + g) / (r − g)</strong> (Gordon growth), with r = 9% and g clamped to a 2–5% band. DDM is very sensitive to r − g, so these carry Medium confidence — treat the number as directional.</p>
+
 
         <!-- DCF DEEP DIVE -->
         <h4 style="color:var(--green); margin-top:32px; border-bottom:1px solid var(--border); padding-bottom:6px;">📈 DCF-Lite Explained</h4>
@@ -1929,7 +2051,7 @@ function renderFairValuePrimer(container) {
           <li><strong>EPS ≠ Free Cash Flow.</strong> Professional DCFs use free cash flow (FCF), not EPS. Companies with heavy depreciation/amortization (acquisitions, physical assets) will show lower EPS than actual cash generation. SimplyWallStreet uses FCF, which is why their estimates are sometimes higher than ours.</li>
           <li><strong>Single discount rate.</strong> We use a flat 10% discount rate for all stocks. In reality, a utility should use ~7% and a speculative biotech ~15%. This oversimplifies risk.</li>
           <li><strong>Growth rate clamping.</strong> We cap growth at +50% and floor it at -20%. This prevents absurd FV estimates but also means hyper-growth or deeply cyclical stocks won't be accurately modeled.</li>
-          <li><strong>Limited sector-specific adjustments.</strong> We now handle BDCs and REITs with NAV-based FV (see above), but banks and utilities still use the generic models. Banks ideally use dividend discount models; utilities use regulated asset base valuation.</li>
+          <li><strong>Model coverage by archetype.</strong> Banks/insurers use ROE-justified P/B, utilities/telecom/MLPs use a Gordon dividend-discount model, and REITs/BDCs use NAV — so financials and yield names are no longer forced through earnings-growth models. Cyclicals (energy, materials, autos, airlines) are still shown via the earnings blend but muted and flagged Low-confidence, because a reliable estimate needs mid-cycle normalized earnings the free data feed doesn't provide.</li>
           <li><strong>Graham Number undervalues tech.</strong> Asset-light companies (SaaS, platforms) have low book value, making Graham systematically conservative. This is a feature, not a bug — but it pulls the blended FV down for tech names.</li>
           <li><strong>Not a substitute for VectorVest or SimplyWallStreet.</strong> Those platforms use proprietary models with forward earnings consensus, sector-relative comparisons, and institutional data feeds we cannot access. Our FV is a <em>directional sanity check</em>, not a professional-grade valuation.</li>
           <li><strong>Turnaround stocks use next-year EPS.</strong> When current-year forward EPS is negative (e.g., BA, LCID), we fall back to next fiscal year's consensus estimate. This is labeled <code>[Fwd+1]</code> in tooltips. If even next-year EPS is ≤ 0, FV shows <strong style="color:var(--yellow);">N/A</strong> — meaning the stock cannot be valued with earnings-based models yet. Check analyst price targets as an alternative signal.</li>
@@ -2469,7 +2591,7 @@ function renderDataSourcesPrimer(container) {
             <td style="padding:6px;">52W Hi/Lo</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/stock/metric → 52WeekHigh, 52WeekLow</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px;">FV (Fair Value)</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">Computed: DCF + Graham + PEG models from EPS, growth, book value</td>
+            <td style="padding:6px;">FV (Fair Value)</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">Computed per archetype: earnings (DCF+Graham+PEG), book/ROE-justified P/B, dividend-discount, or NAV</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px;">Analyst Lo/Mid/Hi</td><td style="padding:6px;">StockAnalysis</td><td style="padding:6px;">/forecast/__data.json → priceTargets</td>
