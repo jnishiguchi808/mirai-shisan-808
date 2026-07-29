@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mirai Ticker Admin</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #fff;
+      color: #202124;
+      font: 14px Arial, sans-serif;
+    }
+    main { width: min(620px, calc(100% - 32px)); text-align: center; }
+    h1 { margin: 0 0 8px; font-size: 34px; font-weight: 500; }
+    .subtitle { margin: 0 0 28px; color: #5f6368; }
+    form { display: grid; gap: 14px; text-align: left; }
+    label { color: #3c4043; font-weight: 600; }
+    textarea, select {
+      width: 100%;
+      margin-top: 7px;
+      border: 1px solid #dfe1e5;
+      border-radius: 12px;
+      background: #fff;
+      color: #202124;
+      font: inherit;
+    }
+    textarea {
+      min-height: 112px;
+      padding: 16px;
+      resize: vertical;
+      text-transform: uppercase;
+    }
+    select { padding: 12px; }
+    textarea:focus, select:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 1px 6px rgba(32, 33, 36, .18);
+    }
+    .hint { margin-top: 6px; color: #5f6368; font-size: 12px; font-weight: 400; }
+    button {
+      justify-self: center;
+      min-width: 130px;
+      border: 0;
+      border-radius: 6px;
+      padding: 11px 22px;
+      background: #1a73e8;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { background: #9aa0a6; cursor: wait; }
+    #status {
+      min-height: 46px;
+      margin-top: 20px;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: left;
+      white-space: pre-wrap;
+    }
+    #status:empty { padding: 0; }
+    .success { background: #e6f4ea; color: #137333; }
+    .error { background: #fce8e6; color: #c5221f; }
+    footer { margin-top: 24px; color: #80868b; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Mirai Ticker Admin</h1>
+    <p class="subtitle">Add symbols to the website and publish them to GitHub.</p>
+
+    <form id="ticker-form">
+      <label>
+        Tickers
+        <textarea id="tickers" placeholder="GARP, UFO, ARTY" required></textarea>
+        <div class="hint">Separate symbols with commas, spaces, or new lines.</div>
+      </label>
+
+      <label>
+        Watchlist
+        <select id="watchlist" required></select>
+      </label>
+
+      <label>
+        Security type
+        <select id="security-type">
+          <option value="stock">Stock</option>
+          <option value="etf">ETF</option>
+          <option value="reit">REIT</option>
+          <option value="bdc">BDC</option>
+        </select>
+        <div class="hint">ETF, REIT, and BDC automatically update their internal classification lists.</div>
+      </label>
+
+      <button id="submit-button" type="submit">Update &amp; Publish</button>
+    </form>
+
+    <div id="status" role="status" aria-live="polite"></div>
+    <footer>Runs independently of Astra and Copilot, using this computer's Git credentials.</footer>
+  </main>
+
+  <script>
+    const form = document.getElementById('ticker-form');
+    const watchlist = document.getElementById('watchlist');
+    const statusBox = document.getElementById('status');
+    const submitButton = document.getElementById('submit-button');
+    let token = '';
+
+    function labelFor(key) {
+      const labels = {
+        ai_robotics: 'AI + Robotics',
+        alcohol_tobacco: 'Alcohol + Tobacco',
+        energy_new: 'Energy (New)',
+        energy_old: 'Energy (Old)',
+        etf_russell: 'ETF (Russell)',
+        etf_sp500: 'ETF (S&P)',
+        etf_statestreet: 'ETF (State Street)',
+        etf_yieldmax: 'ETF (YieldMax)',
+        rawmaterials: 'Raw Materials'
+      };
+      return labels[key] || key.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    async function loadConfig() {
+      const response = await fetch('/api/config');
+      if (!response.ok) throw new Error('Could not load the local editor configuration.');
+      const config = await response.json();
+      token = config.token;
+      const hidden = new Set(['equities', 'etfs']);
+      config.watchlists
+        .filter(key => !hidden.has(key))
+        .sort((a, b) => labelFor(a).localeCompare(labelFor(b)))
+        .forEach(key => watchlist.add(new Option(labelFor(key), key)));
+    }
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      submitButton.disabled = true;
+      statusBox.className = '';
+      statusBox.textContent = 'Updating the website and publishing to GitHub...';
+
+      try {
+        const response = await fetch('/api/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Mirai-Admin-Token': token
+          },
+          body: JSON.stringify({
+            tickers: document.getElementById('tickers').value,
+            watchlist: watchlist.value,
+            securityType: document.getElementById('security-type').value
+          })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Update failed.');
+        statusBox.className = 'success';
+        statusBox.textContent = result.message;
+        form.reset();
+      } catch (error) {
+        statusBox.className = 'error';
+        statusBox.textContent = error.message;
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+
+    loadConfig().catch(error => {
+      statusBox.className = 'error';
+      statusBox.textContent = error.message;
+      submitButton.disabled = true;
+    });
+  </script>
+</body>
+</html>
