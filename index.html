@@ -285,7 +285,7 @@ const WATCHLIST = {
   infrastructure: ['ACM','AIPO','BAM','BIPC','BN','EME','FIX','PWR','RSG','STRL','WM'],
   insurance: ['AFL','LMND','MET','PRU','SIGI','UNH','UNM','UPST'],
   logistics: ['AMKBY','CHRW','CSX','DAC','DHLGY','FDX','GNK','GSL','JBHT','MATX','NSC','ODFL','RXO','SBLK','UNP','UPS','XPO','ZIM'],
-  medical: ['ABBV','ABT','ARKG','BMY','BSX','CVS','DXCM','FLGT','GDRX','GH','GILD','HIMS','ISRG','JNJ','LGND','LLY','MRK','MRNA','OPRX','PFE','SNY','TAK','TMDX','TMO','UNH','VCEL'],
+  medical: ['ABBV','ABT','ARKG','BMY','BSX','CVS','DXCM','FLGT','GDRX','GH','GILD','HIMS','ISRG','JNJ','LGND','LLY','MRK','MRNA','OPRX','PFE','SNY','TAK','TMDX','TMO','UNH','VCEL','VEEV'],
   rawmaterials: ['ALB','B','BHP','CLF','COPX','FCX','GDX','GLD','IAU','LAC','LIT','NGLOY','NUE','RIO','SCCO','SLV','SQM','STLD'],
   reit: ['ADC','AGNC','AMT','CCI','CUBE','DLR','DOC','DX','EPR','GLPI','GOOD','IIPR','IRM','KIM','NLY','NSA','O','OHI','PLD','RHP','SPG','STAG','VICI','VTR','WPC'],
   restaurants: ['CMG','DRI','MCD','QSR','SBUX','TOST','WING','YUM'],
@@ -303,6 +303,51 @@ const ETF_TICKERS = new Set([
   ...(WATCHLIST.etf_statestreet || [])
 ]);
 function saPath(t) { return ETF_TICKERS.has(t) ? 'etf' : 'stocks'; }
+
+const MAX_USABLE_PEG = 10;
+
+function getValidatedPeg(m, currentPrice, forwardEPS, forwardEPSNext) {
+  const providerFields = [
+    ['Finnhub forward PEG', Number(m?.forwardPEG)],
+    ['Finnhub TTM PEG', Number(m?.pegTTM)]
+  ];
+  const provider = providerFields.find(([, value]) => Number.isFinite(value) && value > 0);
+
+  if (currentPrice > 0 && forwardEPS > 0 && forwardEPSNext > 0) {
+    const growthPct = ((forwardEPSNext - forwardEPS) / forwardEPS) * 100;
+    const forwardPE = currentPrice / forwardEPS;
+    if (growthPct > 0 && forwardPE > 0) {
+      const computed = forwardPE / growthPct;
+      const providerNote = provider ? ` | ${provider[0]}: ${provider[1].toFixed(2)}` : '';
+      if (computed <= MAX_USABLE_PEG) {
+        return {
+          value: computed,
+          source: 'Forward consensus',
+          tooltip: `Recalculated: forward P/E ${forwardPE.toFixed(1)} / EPS growth ${growthPct.toFixed(1)}%${providerNote}`
+        };
+      }
+      return {
+        value: null,
+        source: 'Forward consensus',
+        tooltip: `Not meaningful: recalculated PEG ${computed.toFixed(2)} exceeds ${MAX_USABLE_PEG} (forward P/E ${forwardPE.toFixed(1)} / EPS growth ${growthPct.toFixed(1)}%)${providerNote}`
+      };
+    }
+  }
+
+  if (!provider) return { value: null, source: null, tooltip: '' };
+  if (provider[1] <= MAX_USABLE_PEG) {
+    return {
+      value: provider[1],
+      source: provider[0],
+      tooltip: `${provider[0]} accepted because it is within the usable 0-${MAX_USABLE_PEG} range`
+    };
+  }
+  return {
+    value: null,
+    source: provider[0],
+    tooltip: `Not meaningful: ${provider[0]} ${provider[1].toFixed(2)} exceeds ${MAX_USABLE_PEG} and was excluded from valuation calculations`
+  };
+}
 
 // ============================================================
 // VALUATION ARCHETYPE CLASSIFICATION + MODEL REGISTRY
@@ -1155,7 +1200,8 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
       cells[6].textContent = '—';
     }
     cells[7].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
-    const peg = m.forwardPEG || m.pegTTM;
+    const pegInfo = getValidatedPeg(m, priceForPB, data._forwardEPS, data._forwardEPSNext);
+    const peg = pegInfo.value;
     const growth = m.epsGrowthTTMYoy;
     if (peg && peg > 0) {
       let pegColor = 'var(--text-primary)';
@@ -1168,8 +1214,11 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
         pegColor = 'var(--red)';
       }
       const growthStr = growth ? `${growth > 0 ? '+' : ''}${growth.toFixed(0)}% EPS growth YoY` : 'Growth data unavailable';
-      const tipText = peg < 0.5 && growth > 100 ? `${pegWarning}${growthStr} (cyclical?)` : growthStr;
+      const growthNote = peg < 0.5 && growth > 100 ? `${pegWarning}${growthStr} (cyclical?)` : growthStr;
+      const tipText = `${pegInfo.tooltip} | ${growthNote}`;
       cells[9].innerHTML = `<span style="color:${pegColor}" title="${tipText}">${peg.toFixed(2)}</span>`;
+    } else if (pegInfo.source) {
+      cells[9].innerHTML = `<span style="color:var(--yellow)" title="${pegInfo.tooltip}">N/M</span>`;
     } else {
       cells[9].textContent = '—';
     }
@@ -1267,16 +1316,16 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
     } else if (eps > 0) {
       let models = [];
       let tips = [];
-      // Growth estimate: prefer forward EPS growth, then forward PEG-implied, then TTM
+      // Growth estimate: prefer forward EPS growth, then validated provider PEG-implied, then TTM
       const pe = m.peNormalizedAnnual;
-      const fwdPEG = m.forwardPEG;
+      const validatedProviderPEG = pegInfo.source?.startsWith('Finnhub') ? pegInfo.value : null;
       let growthSource = 'TTM';
       let growthPct;
       if (fwdEPS && fwdEPS > 0 && fwdEPSNext && fwdEPSNext > 0) {
         growthPct = ((fwdEPSNext - fwdEPS) / fwdEPS) * 100;
         growthSource = 'Fwd';
-      } else if (fwdPEG && fwdPEG > 0 && pe && pe > 0) {
-        growthPct = pe / fwdPEG;
+      } else if (validatedProviderPEG && pe && pe > 0) {
+        growthPct = pe / validatedProviderPEG;
         growthSource = 'PEG';
       } else if (epsGrowth) {
         growthPct = epsGrowth;
@@ -1881,7 +1930,7 @@ function renderFairValuePrimer(container) {
           <p style="margin:0 0 8px 0; font-weight:600; color:var(--text-primary);">Priority Order:</p>
           <ol style="margin:0; padding-left:20px; font-size:0.85rem;">
             <li><strong>Forward EPS growth</strong> (best): <code>(nextYearEPS − thisYearEPS) / thisYearEPS</code> — when StockAnalysis provides both this-year and next-year consensus estimates</li>
-            <li><strong>Forward PEG-implied growth</strong> (good): <code>P/E ÷ Forward PEG</code> — reflects analyst consensus expectations for future growth</li>
+            <li><strong>Validated PEG-implied growth</strong> (good): <code>P/E ÷ Forward PEG</code> — provider PEG values above 10 are treated as not meaningful and excluded</li>
             <li><strong>Trailing TTM EPS growth</strong> (fallback): Used when neither forward source is available</li>
             <li><strong>8% default</strong>: Used when no growth data exists</li>
           </ol>
@@ -2585,7 +2634,7 @@ function renderDataSourcesPrimer(container) {
             <td style="padding:6px;">Price, Chg$, Chg%, Vol</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/quote → c, pc, v</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px;">Beta, P/B, P/E, PEG</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/stock/metric → beta, peNormalized, pegTTM; P/B = live price / bookValuePerShareAnnual</td>
+            <td style="padding:6px;">Beta, P/B, P/E, PEG</td><td style="padding:6px;">Finnhub + StockAnalysis</td><td style="padding:6px;">PEG is recalculated from forward consensus EPS when available; Finnhub forwardPEG/pegTTM is accepted only when ≤ 10. P/B = live price / bookValuePerShareAnnual</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px;">5Y P/E</td><td style="padding:6px;">Macrotrends</td><td style="padding:6px;">HTML table scrape → 5yr median</td>
