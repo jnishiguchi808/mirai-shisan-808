@@ -179,6 +179,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="bdc" style="padding-left:28px;">BDC</a>
     <a href="#" data-view="cybersecurity" style="padding-left:28px;">Cybersecurity</a>
     <a href="#" data-view="defense" style="padding-left:28px;">Defense</a>
+    <a href="#" data-view="drones" style="padding-left:28px;">Drones &amp; Autonomous Systems</a>
     <a href="#" data-view="energy-new" style="padding-left:28px;">Energy (New)</a>
     <a href="#" data-view="energy-old" style="padding-left:28px;">Energy (Old)</a>
     <a href="#" data-view="fidelity" style="padding-left:28px;">ETF (Fidelity)</a>
@@ -269,6 +270,7 @@ const WATCHLIST = {
   bdc: ['ARCC','BXSL','GAIN','GLAD','HRZN','HTGC','MAIN','OBDC','TSLX'],
   cybersecurity: ['BUG','CIBR','CRWD','FTNT','NET','OKTA','PANW','PLTR','S','TENB','ZS'],
   defense: ['AXON','BA','GD','HII','ITA','KTOS','LHX','LMT','NOC','PLTR','PPA','RTX','TDG','UFO'],
+  drones: ['AVAV','DRNZ','JEDI','KTOS','RCAT'],
   energy_new: ['AIPO','AMT','BE','BEPC','BLDP','BLNK','BWA','BWXT','CCJ','CEG','CHPT','ENPH','EVGO','FCEL','FSLR','GEV','HMC','HYLN','ICLN','LCID','LIT','MVST','NEE','NIU','NNE','NRDE','OKLO','PLUG','QS','SMR','SPRU','UEC','URA','URNM','UUUU','VST','XIFR'],
   energy_old: ['AQN','BKR','COP','CVX','DUK','DVN','ECO','EQT','ET','FANG','GNRC','HAL','HE','KMI','LB','LNG','MLPA','MLPI','MUR','OKE','OXY','PBA','PR','PSX','SLB','SMR','TTE','VNOM','XOM'],
   equities: [],
@@ -276,7 +278,7 @@ const WATCHLIST = {
   etf_sp500: ['BALI','CGDV','DGRO','GARP','GPIQ','IDVO','ISPY','JEPQ','JPIE','SCHD','SPMO','SPY','SPYI','SPYM','VFLO','VOO','XLG'],
   etf_statestreet: ['DIA','GLD','MDY','SPY','XLB','XLC','XLE','XLF','XLI','XLK','XLP','XLRE','XLU','XLV','XLY'],
   etf_yieldmax: ['ABNY','AMDY','APLY','CONY','FBY','GDXY','GOOY','MRNY','NFLY','NVDY','OARK','PLTY','PYPY','SMCY','TSLY','TSMY','ULTY','XOMO','XYZY','YBIT','YMAG'],
-  etfs: ['AIPO','AIQ','ARKF','ARKG','ARTY','BOTZ','BUG','CIBR','COPX','GDX','GLD','IAU','IBIT','ICLN','ITA','KBE','KRE','LIT','MLPA','MLPI','NAIL','PPA','ROBT','SLV','SOXQ','UFO','XLF'],
+  etfs: ['AIPO','AIQ','ARKF','ARKG','ARTY','BOTZ','BUG','CIBR','COPX','DRNZ','GDX','GLD','IAU','IBIT','ICLN','ITA','JEDI','KBE','KRE','LIT','MLPA','MLPI','NAIL','PPA','ROBT','SLV','SOXQ','UFO','XLF'],
   ev: ['F','GM','LCID','NIO','TM','TSLA','VFS','XPEV'],
   fidelity: ['FBCG','FBCV','FBOT','FBUF','FCLD','FCOM','FCPI','FDBC','FDCF','FDEM','FDIF','FDIG','FDIS','FDLO','FDMO','FDRR','FDRV','FDTX','FDVV','FEAC','FELC','FELG','FELV','FEMR','FENI','FESM','FFDI','FFEM','FFGX','FFLC','FFLG','FFLV','FFSM','FHLC','FIDI','FIDU','FIVA','FLRG','FMAG','FMDE','FMET','FNCL','FPRO','FQAL','FRNW','FSEV','FSMD','FTEC','FVAL','ONEQ'],
   fintech: ['AFRM','APPS','ARKF','AXP','CBOE','COIN','FVRR','HOOD','IBIT','INTU','MA','MBGL','MQ','NU','PAGS','PAYC','PSFE','PYPL','RIOT','SE','SHOP','SNOW','SOFI','SPGI','STNE','TIGR','UPST','V','XYZ'],
@@ -355,6 +357,7 @@ function getValidatedPeg(m, currentPrice, forwardEPS, forwardEPSNext) {
 // valuation archetype, and each archetype maps to the fair-value model that fits
 // how that kind of business actually creates value:
 //   earnings → DCF + Graham + PEG blend   (default; operating companies)
+//   franchise→ DCF + normalized P/E blend (asset-light royalty/franchise businesses)
 //   nav      → fair value = book value    (REITs, BDCs — pass-throughs at ~1x book)
 //   book     → ROE-justified P/B          (banks, insurers — earnings models understate)
 //   yield    → Gordon dividend-discount   (utilities, telecom, pipelines/MLPs)
@@ -374,6 +377,9 @@ const ARCHETYPE_OVERRIDES = (() => {
   tag(WATCHLIST.banking, 'book');
   // Traditional insurance carriers → book (managed-care/insurtech left as earnings)
   tag(['AFL','MET','PRU','SIGI','UNM','ALL','TRV','CB','AIG','PGR','HIG','CINF','MFC','SLF','AIZ','GL','L'], 'book');
+  // Asset-light franchisors earn recurring royalty/management fees; book value and
+  // PEG=1 are poor anchors for these high-return, buyback-heavy businesses.
+  tag(['DPZ','HLT','MAR','MCD','PLNT','QSR','WING','YUM'], 'franchise');
   // Regulated utilities / renewables-yield
   tag(['DUK','NEE','SO','D','AEP','EXC','XEL','ED','WEC','ES','PEG','DTE','PPL','CMS','AQN','HE','CEG','VST','GEV','BEPC','FE','AEE','LNT','NI','PNW','EIX','SRE'], 'yield');
   // Midstream / pipelines / MLPs (income vehicles)
@@ -408,6 +414,48 @@ function getArchetype(ticker, isETF, industry) {
 const BANK_COST_OF_EQUITY = 0.10;    // mid-cycle required return on bank equity (r)
 const BANK_TERMINAL_GROWTH = 0.04;   // long-run book-value growth (g)
 const DDM_COST_OF_EQUITY = 0.09;     // required return for utility/telecom/MLP equity (r)
+const FRANCHISE_DCF_WEIGHT = 0.25;
+const FRANCHISE_MULTIPLE_WEIGHT = 0.75;
+
+// BEGIN TESTABLE VALUATION HELPERS
+function earningsDCF(eps, growthPct, isGrowthTier) {
+  if (!Number.isFinite(eps) || eps <= 0 || !Number.isFinite(growthPct)) return null;
+  const discountRate = 0.10;
+  const termGrowth = 0.03;
+  const g = Math.min(Math.max(growthPct / 100, -0.2), 0.5);
+  let dcfSum = 0;
+
+  if (isGrowthTier) {
+    for (let yr = 1; yr <= 5; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1 + discountRate, yr);
+    let cumEPS = eps * Math.pow(1 + g, 5);
+    for (let yr = 6; yr <= 10; yr++) {
+      const fade = (10 - yr) / 5;
+      const stageG = termGrowth + (g - termGrowth) * fade;
+      cumEPS *= (1 + stageG);
+      dcfSum += cumEPS / Math.pow(1 + discountRate, yr);
+    }
+    const terminalEPS = cumEPS * (1 + termGrowth);
+    dcfSum += (terminalEPS / (discountRate - termGrowth)) / Math.pow(1 + discountRate, 10);
+  } else {
+    for (let yr = 1; yr <= 5; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1 + discountRate, yr);
+    const terminalEPS = eps * Math.pow(1 + g, 5) * (1 + termGrowth);
+    dcfSum += (terminalEPS / (discountRate - termGrowth)) / Math.pow(1 + discountRate, 5);
+  }
+  return dcfSum;
+}
+
+function franchiseEarningsFV(eps, growthPct) {
+  const dcfFV = earningsDCF(eps, growthPct, false);
+  if (!dcfFV) return null;
+
+  // Recurring royalty economics justify a higher earnings floor than asset-heavy
+  // value stocks, while the cap prevents a short-term growth spike from dominating.
+  const normalizedPE = Math.min(Math.max(15 + growthPct, 18), 30);
+  const multipleFV = eps * normalizedPE;
+  const fv = dcfFV * FRANCHISE_DCF_WEIGHT + multipleFV * FRANCHISE_MULTIPLE_WEIGHT;
+  return { fv, dcfFV, multipleFV, normalizedPE };
+}
+// END TESTABLE VALUATION HELPERS
 
 // Banks / insurers: Fair P/B = (ROE − g) / (r − g); FV = price × (Fair P/B ÷ actual P/B).
 // Using the P/B RATIO (not raw book value per share) makes this currency- and ADR-ratio-
@@ -573,6 +621,7 @@ function loadView(view) {
     case 'bdc': renderWatchlist(main, 'bdc', 'BDC Watchlist'); break;
     case 'cybersecurity': renderWatchlist(main, 'cybersecurity', 'Cybersecurity Watchlist'); break;
     case 'defense': renderWatchlist(main, 'defense', 'Defense Watchlist'); break;
+    case 'drones': renderWatchlist(main, 'drones', 'Drones & Autonomous Systems Watchlist'); break;
     case 'energy-new': renderWatchlist(main, 'energy_new', 'Energy (New) Watchlist'); break;
     case 'energy-old': renderWatchlist(main, 'energy_old', 'Energy (Old) Watchlist'); break;
     case 'etf-russell': renderWatchlist(main, 'etf_russell', 'ETF (Russell) Watchlist'); break;
@@ -1333,39 +1382,24 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
         growthPct = 8; // default assumption
       }
 
+      if (archetype === 'franchise') {
+        const franchiseFV = franchiseEarningsFV(eps, growthPct);
+        if (franchiseFV && currentPrice > 0) {
+          const fv = franchiseFV.fv;
+          const gap = ((fv - currentPrice) / currentPrice * 100).toFixed(0);
+          const fvColor = fv > currentPrice * 1.1 ? 'var(--green)' : fv < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
+          const confidence = epsSource === 'Fwd' && growthSource === 'Fwd' ? 'High' : 'Medium';
+          const fxNote = fxApplied ? `, FX: ${fxApplied}→USD` : '';
+          const tipStr = `DCF(5yr): $${franchiseFV.dcfFV.toFixed(0)} | Normalized P/E ${franchiseFV.normalizedPE.toFixed(1)}x: $${franchiseFV.multipleFV.toFixed(0)} | Blend (25/75): $${fv.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [Franchise Model | EPS: $${eps.toFixed(2)} ${epsSource}${fxNote} | Growth: ${growthPct.toFixed(1)}% ${growthSource} | Method: Asset-light franchise earnings | Confidence: ${confidence}]`;
+          cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${fv.toFixed(0)}</span>`;
+        }
+      } else {
       // Two-tier model: Growth (P/E > 25) vs Value (P/E ≤ 25)
       const isGrowthTier = pe && pe > 25;
       const dcfYears = isGrowthTier ? 10 : 5;
       const pegCap = isGrowthTier ? 60 : 40;
       const modelTier = isGrowthTier ? 'Growth' : 'Value';
-      const discountRate = 0.10;
-      const termGrowth = 0.03;
-
-      const g = Math.min(Math.max(growthPct / 100, -0.2), 0.5);
-      let dcfSum = 0;
-      if (isGrowthTier) {
-        // Two-stage DCF: Stage 1 (yrs 1-5) full growth, Stage 2 (yrs 6-10) tapers to terminal
-        for (let yr = 1; yr <= 5; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1 + discountRate, yr);
-        let cumEPS = eps * Math.pow(1 + g, 5);
-        for (let yr = 6; yr <= 10; yr++) {
-          const fade = (10 - yr) / 5; // 0.8, 0.6, 0.4, 0.2, 0.0
-          const stageG = termGrowth + (g - termGrowth) * fade;
-          cumEPS *= (1 + stageG);
-          dcfSum += cumEPS / Math.pow(1 + discountRate, yr);
-        }
-        const terminalEPS = cumEPS * (1 + termGrowth);
-        const terminalVal = terminalEPS / (discountRate - termGrowth);
-        const pvTerminal = terminalVal / Math.pow(1 + discountRate, 10);
-        dcfSum += pvTerminal;
-      } else {
-        // Single-stage DCF: constant growth for 5 years
-        for (let yr = 1; yr <= 5; yr++) dcfSum += (eps * Math.pow(1 + g, yr)) / Math.pow(1 + discountRate, yr);
-        const terminalEPS = eps * Math.pow(1 + g, 5) * (1 + termGrowth);
-        const terminalVal = terminalEPS / (discountRate - termGrowth);
-        const pvTerminal = terminalVal / Math.pow(1 + discountRate, 5);
-        dcfSum += pvTerminal;
-      }
-      const dcfFV = dcfSum;
+      const dcfFV = earningsDCF(eps, growthPct, isGrowthTier);
       if (dcfFV > 0 && dcfFV < currentPrice * 10) { models.push(dcfFV); tips.push(`DCF(${dcfYears}yr): $${dcfFV.toFixed(0)}`); }
       // Graham Number: only for Value tier — meaningless for asset-light growth stocks
       if (!isGrowthTier && bookVal && bookVal > 0) {
@@ -1391,6 +1425,7 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
         const cycNote = isCyclical ? ' ⚠ Cyclical: trailing EPS distorts earnings models — treat as rough; use mid-cycle normalized EPS.' : '';
         const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [${modelTier} Model | EPS: $${eps.toFixed(2)} ${epsSource}${fxNote} | Growth: ${growthPct.toFixed(1)}% ${growthSource} | Method: ${method} | Confidence: ${confidence}]${cycNote}`;
         cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
+      }
       }
     }
   }
@@ -1746,7 +1781,7 @@ function renderFairValuePrimer(container) {
 
         <!-- WHAT IS IT -->
         <h4 style="color:var(--green); margin-top:24px; border-bottom:1px solid var(--border); padding-bottom:6px;">📐 What Is the FV Column?</h4>
-        <p>The FV column shows a <strong>fair value estimate</strong> derived from a valuation model chosen by the stock's <em>archetype</em> (earnings, book, yield, NAV, or cyclical — see below). For most stocks this blends three independent models; specialized archetypes use a fitter model. The number is color-coded:</p>
+        <p>The FV column shows a <strong>fair value estimate</strong> derived from a valuation model chosen by the stock's <em>archetype</em> (earnings, franchise, book, yield, NAV, or cyclical — see below). For most stocks this blends three independent models; specialized archetypes use a fitter model. The number is color-coded:</p>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:12px 0;">
           <div style="background:var(--bg-card); border-radius:8px; padding:12px; text-align:center;">
             <div style="font-size:1.2rem; color:var(--green);">$XXX</div>
@@ -1822,6 +1857,12 @@ function renderFairValuePrimer(container) {
               <td style="padding:8px;">High / Med</td>
             </tr>
             <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;"><strong style="color:var(--green);">Asset-Light Franchise</strong></td>
+              <td style="padding:8px;">Royalty/management-fee franchisors such as MCD, YUM, QSR, MAR, and HLT</td>
+              <td style="padding:8px;">25% 5-year earnings DCF + 75% normalized P/E (15 + growth, bounded 18–30×). No Graham or PEG=1.</td>
+              <td style="padding:8px;">High / Med</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
               <td style="padding:8px;"><strong style="color:var(--purple);">NAV</strong></td>
               <td style="padding:8px;">REITs, BDCs</td>
               <td style="padding:8px;">Fair value = book value (price ≈ NAV for pass-throughs)</td>
@@ -1855,7 +1896,7 @@ function renderFairValuePrimer(container) {
           <p style="margin:12px 0 0; font-size:0.75rem; color:var(--text-dim);">Every FV tooltip ends with <strong>[Method: … | Confidence: …]</strong> so you can see which archetype/model produced the number and how much to trust it.</p>
         </div>
 
-        <p><strong>Why archetypes instead of one model?</strong> Earnings-growth models (DCF / Graham / PEG) assume a company retains and compounds earnings — wrong for businesses whose value comes from assets (banks, REITs), dividends (utilities), or mid-cycle normalized earnings (commodities). Forcing them through the generic blend produced systematically low fair values — e.g. quality banks flagged "overvalued" purely because their growth rate is modest. Each archetype swaps in the lens practitioners actually use. Within <strong>Earnings</strong> we still split Growth (P/E &gt; 25) vs Value (P/E ≤ 25): the Graham Number is dropped for asset-light growth names (GOOGL, ISRG, NVDA) where tiny book value makes it absurdly low, and the DCF extends to 10 years to reflect the longer runway the market prices in. Value stocks keep the conservative 3-model blend that suits mature, asset-heavy businesses.</p>
+        <p><strong>Why archetypes instead of one model?</strong> Earnings-growth models (DCF / Graham / PEG) assume a company retains and compounds earnings — wrong for businesses whose value comes from assets (banks, REITs), dividends (utilities), recurring franchise royalties, or mid-cycle normalized earnings (commodities). Forcing them through the generic blend produced systematically low fair values. Each archetype swaps in the lens practitioners actually use. <strong>Asset-Light Franchise</strong> companies omit Graham because buybacks and minimal tangible capital distort book value, and omit PEG=1 because a mature 8% grower with durable royalties should not automatically be valued at only 8× earnings. Their FV weights a conservative earnings DCF at 25% and a bounded growth-adjusted P/E at 75%. Within ordinary <strong>Earnings</strong> stocks we still split Growth (P/E &gt; 25) vs Value (P/E ≤ 25).</p>
 
         <p><strong>Book (ROE) model — banks &amp; insurers.</strong> A bank that earns a 17% return on equity is worth well above book value; one earning 6% is worth less. Pure NAV (P/B = 1) is therefore wrong for banks. We use the justified price-to-book from the Gordon model: <strong>Fair P/B = (ROE − g) / (r − g)</strong>, with cost of equity r = 10% and long-run book-value growth g = 4%. Rather than multiplying a raw book-value-per-share (which breaks for foreign ADRs whose book value is reported in local currency while the ADR trades in USD — e.g. the Japanese megabanks MUFG/MFG/SMFG), we apply the ratio to the live price: <strong>FV = price × (Fair P/B ÷ actual P/B)</strong>. Because both P/B figures are dimensionless, this is currency- and ADR-ratio-invariant. If ROE is missing or ≤ g, we fall back to the earnings blend.</p>
 
@@ -2112,8 +2153,8 @@ function renderFairValuePrimer(container) {
           <li><strong>EPS ≠ Free Cash Flow.</strong> Professional DCFs use free cash flow (FCF), not EPS. Companies with heavy depreciation/amortization (acquisitions, physical assets) will show lower EPS than actual cash generation. SimplyWallStreet uses FCF, which is why their estimates are sometimes higher than ours.</li>
           <li><strong>Single discount rate.</strong> We use a flat 10% discount rate for all stocks. In reality, a utility should use ~7% and a speculative biotech ~15%. This oversimplifies risk.</li>
           <li><strong>Growth rate clamping.</strong> We cap growth at +50% and floor it at -20%. This prevents absurd FV estimates but also means hyper-growth or deeply cyclical stocks won't be accurately modeled.</li>
-          <li><strong>Model coverage by archetype.</strong> Banks/insurers use ROE-justified P/B, utilities/telecom/MLPs use a Gordon dividend-discount model, and REITs/BDCs use NAV — so financials and yield names are no longer forced through earnings-growth models. Cyclicals (energy, materials, autos, airlines) are still shown via the earnings blend but muted and flagged Low-confidence, because a reliable estimate needs mid-cycle normalized earnings the free data feed doesn't provide.</li>
-          <li><strong>Graham Number undervalues tech.</strong> Asset-light companies (SaaS, platforms) have low book value, making Graham systematically conservative. This is a feature, not a bug — but it pulls the blended FV down for tech names.</li>
+          <li><strong>Model coverage by archetype.</strong> Asset-light franchisors use DCF plus a normalized earnings multiple; banks/insurers use ROE-justified P/B; utilities/telecom/MLPs use a Gordon dividend-discount model; and REITs/BDCs use NAV. Cyclicals (energy, materials, autos, airlines) are still shown via the earnings blend but muted and flagged Low-confidence, because a reliable estimate needs mid-cycle normalized earnings the free data feed doesn't provide.</li>
+          <li><strong>Graham Number has narrow applicability.</strong> Asset-light companies have low or buyback-distorted book value, making Graham systematically conservative. Curated franchisors and Growth-tier earnings stocks therefore exclude it; mature, asset-heavy Value-tier companies retain it.</li>
           <li><strong>Not a substitute for VectorVest or SimplyWallStreet.</strong> Those platforms use proprietary models with forward earnings consensus, sector-relative comparisons, and institutional data feeds we cannot access. Our FV is a <em>directional sanity check</em>, not a professional-grade valuation.</li>
           <li><strong>Turnaround stocks use next-year EPS.</strong> When current-year forward EPS is negative (e.g., BA, LCID), we fall back to next fiscal year's consensus estimate. This is labeled <code>[Fwd+1]</code> in tooltips. If even next-year EPS is ≤ 0, FV shows <strong style="color:var(--yellow);">N/A</strong> — meaning the stock cannot be valued with earnings-based models yet. Check analyst price targets as an alternative signal.</li>
         </ul>
@@ -2144,7 +2185,7 @@ function renderFairValuePrimer(container) {
               <td style="padding:8px;">Models</td>
               <td style="padding:8px;">Proprietary single model</td>
               <td style="padding:8px;">2-stage DCF</td>
-              <td style="padding:8px;">3-model blend (DCF + Graham + PEG)</td>
+              <td style="padding:8px;">Archetype-specific: earnings blend, franchise DCF/P-E, book, DDM, or NAV</td>
             </tr>
             <tr style="border-bottom:1px solid var(--border);">
               <td style="padding:8px;">Discount Rate</td>
@@ -2652,7 +2693,7 @@ function renderDataSourcesPrimer(container) {
             <td style="padding:6px;">52W Hi/Lo</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/stock/metric → 52WeekHigh, 52WeekLow</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px;">FV (Fair Value)</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">Computed per archetype: earnings (DCF+Graham+PEG), book/ROE-justified P/B, dividend-discount, or NAV</td>
+            <td style="padding:6px;">FV (Fair Value)</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">Computed per archetype: earnings (DCF+Graham+PEG), asset-light franchise (DCF+normalized P/E), book/ROE-justified P/B, dividend-discount, or NAV</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px;">Analyst Lo/Mid/Hi</td><td style="padding:6px;">StockAnalysis</td><td style="padding:6px;">/forecast/__data.json → priceTargets</td>
