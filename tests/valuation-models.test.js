@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
-assert.match(html, /drones:\s*\['AVAV','DRNZ','JEDI','KTOS','RCAT'\]/);
+assert.match(html, /drones:\s*\['ACHR','AIRO','AVAV','AVEX','BKSY','DPRO','DRNZ','EH','EVTL','JEDI','JOBY','KTOS','ONDS','PL','RCAT','RDW','SWMR','UAVS','UMAC','ZENA'\]/);
 assert.match(html, /etfs:\s*\[[^\]]*'DRNZ'[^\]]*'JEDI'/);
 
 function between(start, end) {
