@@ -197,6 +197,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="insurance" style="padding-left:28px;">Insurance</a>
     <a href="#" data-view="logistics" style="padding-left:28px;">Logistics</a>
     <a href="#" data-view="medical" style="padding-left:28px;">Medical</a>
+    <a href="#" data-view="quantum" style="padding-left:28px;">Quantum Computing</a>
     <a href="#" data-view="rawmaterials" style="padding-left:28px;">Raw Materials</a>
     <a href="#" data-view="reit" style="padding-left:28px;">REIT</a>
     <a href="#" data-view="restaurants" style="padding-left:28px;">Restaurants</a>
@@ -298,7 +299,7 @@ loadFXRates();
 const WATCHLIST = {
   advertising: ['APP','APPS','DV','GOOGL','META','MGNI','PINS','PUBM','RDDT','ROKU','SNAP','TTD'],
   agriculture: ['AGCO','ADM','CAT','DE','MOS','NTR','TSCO'],
-  ai_robotics: ['AAPL','AI','AIPO','AIQ','AMAT','AMD','AMKR','AMZN','APPN','ARTY','ASML','AVGO','BOTZ','CRDO','CRM','DUOL','GOOGL','HNHPF','IBM','INTC','IOT','IREN','ISRG','LRCX','META','MSFT','NOW','NVDA','PATH','PLTR','QCOM','RDDT','ROBT','SMCI','SNOW','SOUN','STRL','TSM'],
+  ai_robotics: ['AAPL','AI','AIPO','AIQ','ALMU','AMAT','AMD','AMKR','AMZN','APPN','ARTY','ASML','AVGO','BOTZ','CRDO','CRM','DUOL','GOOGL','HNHPF','IBM','INTC','IOT','IREN','ISRG','LRCX','META','MSFT','NOW','NVDA','PATH','PLTR','QCOM','QNT','RDDT','RGTI','ROBT','SMCI','SNOW','SOUN','STRL','TSM'],
   alcohol_tobacco: ['BTI','BUD','DEO','JAPAY','MO','PM','SAM','STZ','TAP'],
   banking: ['BAC','BNS','C','CPF','GS','JPM','KBE','KRE','MFG','MS','MUFG','PNC','SCHW','SMFG','TD','USB','WFC','XLF'],
   bdc: ['ARCC','BXSL','GAIN','GLAD','HRZN','HTGC','MAIN','OBDC','TSLX'],
@@ -312,7 +313,7 @@ const WATCHLIST = {
   etf_sp500: ['BALI','CGDV','DGRO','GARP','GPIQ','IDVO','ISPY','JEPQ','JPIE','SCHD','SPMO','SPY','SPYI','SPYM','VFLO','VOO','XLG'],
   etf_statestreet: ['DIA','GLD','MDY','SPY','XLB','XLC','XLE','XLF','XLI','XLK','XLP','XLRE','XLU','XLV','XLY'],
   etf_yieldmax: ['ABNY','AMDY','APLY','CONY','FBY','GDXY','GOOY','MRNY','NFLY','NVDY','OARK','PLTY','PYPY','SMCY','TSLY','TSMY','ULTY','XOMO','XYZY','YBIT','YMAG'],
-  etfs: ['AIPO','AIQ','ARKF','ARKG','ARTY','BOTZ','BUG','CIBR','COPX','DRNZ','GDX','GLD','IAU','IBIT','ICLN','ITA','JEDI','KBE','KRE','LIT','MLPA','MLPI','NAIL','PPA','ROBT','SLV','SOXQ','UFO','XLF'],
+  etfs: ['AIPO','AIQ','ARKF','ARKG','ARTY','BOTZ','BUG','CIBR','COPX','DRNZ','GDX','GLD','IAU','IBIT','ICLN','ITA','JEDI','KBE','KRE','LIT','MLPA','MLPI','NAIL','PPA','QTUM','ROBT','SLV','SOXQ','UFO','XLF'],
   ev: ['F','GM','LCID','NIO','TM','TSLA','VFS','XPEV'],
   fidelity: ['FBCG','FBCV','FBOT','FBUF','FCLD','FCOM','FCPI','FDBC','FDCF','FDEM','FDIF','FDIG','FDIS','FDLO','FDMO','FDRR','FDRV','FDTX','FDVV','FEAC','FELC','FELG','FELV','FEMR','FENI','FESM','FFDI','FFEM','FFGX','FFLC','FFLG','FFLV','FFSM','FHLC','FIDI','FIDU','FIVA','FLRG','FMAG','FMDE','FMET','FNCL','FPRO','FQAL','FRNW','FSEV','FSMD','FTEC','FVAL','ONEQ'],
   fintech: ['AFRM','APPS','ARKF','AXP','CBOE','COIN','FVRR','HOOD','IBIT','INTU','MA','MBGL','MQ','NU','PAGS','PAYC','PSFE','PYPL','RIOT','SE','SHOP','SNOW','SOFI','SPGI','STNE','TIGR','UPST','V','XYZ'],
@@ -322,11 +323,12 @@ const WATCHLIST = {
   insurance: ['AFL','LMND','MET','PRU','SIGI','UNH','UNM','UPST'],
   logistics: ['AMKBY','CHRW','CSX','DAC','DHLGY','FDX','GNK','GSL','JBHT','MATX','NSC','ODFL','RXO','SBLK','UNP','UPS','XPO','ZIM'],
   medical: ['ABBV','ABT','ARKG','BMY','BSX','CVS','DXCM','FLGT','GDRX','GH','GILD','HIMS','ISRG','JNJ','LGND','LLY','MRK','MRNA','OPRX','PFE','SNY','TAK','TMDX','TMO','UNH','VCEL','VEEV'],
+  quantum: ['AMZN','GOOGL','HON','IBM','INFQ','INTC','IONQ','IQMX','MSFT','NVDA','QBTS','QNT','QTUM','QUBT','RGTI'],
   rawmaterials: ['ALB','B','BHP','CLF','COPX','FCX','GDX','GLD','IAU','LAC','LIT','NGLOY','NUE','RIO','SCCO','SLV','SQM','STLD'],
   reit: ['ADC','AGNC','AMT','CCI','CUBE','DLR','DOC','DX','EPR','GLPI','GOOD','IIPR','IRM','KIM','NLY','NSA','O','OHI','PLD','RHP','SPG','STAG','VICI','VTR','WPC'],
   restaurants: ['CMG','DRI','MCD','QSR','SBUX','TOST','WING','YUM'],
   retail: ['AMZN','COST','CPNG','CROX','DDS','DIS','EBAY','ETSY','HAS','JMIA','KIM','KSS','LULU','MELI','NKE','O','ONON','SKT','SPG','TGT','WMT'],
-  semiconductors: ['AMAT','AMD','AMKR','ASML','COHR','CRDO','CRUS','GFS','INTC','KLIC','LRCX','LSCC','MRVL','MU','NVDA','QCOM','SLAB','SOXQ','SWKS','TSM','TXN','UMC','WOLF'],
+  semiconductors: ['ALMU','AMAT','AMD','AMKR','ASML','COHR','CRDO','CRUS','GFS','INTC','KLIC','LRCX','LSCC','MRVL','MU','NVDA','QCOM','SLAB','SOXQ','SWKS','TSM','TXN','UMC','WOLF'],
   staples: ['CL','CLX','CPB','GIS','K','KHC','KMB','KO','MDLZ','PEP','PG','SJM'],
   travel: ['AAL','ABNB','ALK','BA','BKNG','CCL','DAL','H','MAR','UAL'],
   vanguard: ['IVOG','IVOO','IVOV','MGC','MGK','MGV','VB','VBK','VBR','VCR','VEA','VEU','VEXC','VFMF','VFMO','VFQY','VGK','VGT','VIG','VIOG','VIOO','VIOV','VIS','VNQ','VNQI','VO','VOE','VONE','VONG','VONV','VOO','VOOG','VOOV','VOT','VOX','VPL','VSGX','VSS','VT','VTHR','VTI','VTV','VTWG','VTWO','VTWV','VUG','VV','VWO','VXF','VXUS','VYM']
@@ -672,6 +674,7 @@ function loadView(view) {
     case 'insurance': renderWatchlist(main, 'insurance', 'Insurance Watchlist'); break;
     case 'logistics': renderWatchlist(main, 'logistics', 'Logistics Watchlist'); break;
     case 'medical': renderWatchlist(main, 'medical', 'Medical Watchlist'); break;
+    case 'quantum': renderWatchlist(main, 'quantum', 'Quantum Computing Watchlist'); break;
     case 'rawmaterials': renderWatchlist(main, 'rawmaterials', 'Raw Materials Watchlist'); break;
     case 'reit': renderWatchlist(main, 'reit', 'REIT Watchlist'); break;
     case 'restaurants': renderWatchlist(main, 'restaurants', 'Restaurants Watchlist'); break;
