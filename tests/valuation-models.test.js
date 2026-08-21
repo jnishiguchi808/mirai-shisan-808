@@ -22,7 +22,7 @@ assert.match(html, /quantum:\s*\['AMZN','GOOGL','HON','IBM','INFQ','INTC','IONQ'
 assert.match(html, /data-view="quantum"/);
 assert.match(html, /rawmaterials:\s*\[[^\]]*'COPJ'[^\]]*'MP'[^\]]*'REMX'[^\]]*'REXC'[^\]]*'SETM'[^\]]*'TMQ'[^\]]*'USAR'/);
 assert.match(html, /etfs:\s*\[[^\]]*'COPJ'[^\]]*'REMX'[^\]]*'REXC'[^\]]*'SETM'/);
-assert.match(html, /retail:\s*\[[^\]]*'ROST'[^\]]*'TJX'/);
+assert.match(html, /retail:\s*\[[^\]]*'DG'[^\]]*'DLTR'[^\]]*'ROST'[^\]]*'TJX'/);
 assert.match(html, /drones:\s*\['ACHR','AIRO','AVAV','AVEX','BKSY','DPRO','DRNZ','EH','EVTL','JEDI','JOBY','KTOS','MBLY','ONDS','PDYN','PL','RCAT','RDW','SWMR','UAVS','UMAC','ZENA'\]/);
 assert.match(html, /etfs:\s*\[[^\]]*'DRNZ'[^\]]*'JEDI'/);
 assert.doesNotMatch(html, /s3\.tradingview\.com|new TradingView\.widget/);
