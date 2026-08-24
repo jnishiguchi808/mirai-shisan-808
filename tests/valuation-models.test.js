@@ -27,6 +27,13 @@ assert.match(html, /drones:\s*\['ACHR','AIRO','AVAV','AVEX','BKSY','DPRO','DRNZ'
 assert.match(html, /etfs:\s*\[[^\]]*'DRNZ'[^\]]*'JEDI'/);
 assert.doesNotMatch(html, /s3\.tradingview\.com|new TradingView\.widget/);
 assert.match(html, /function finnhubFetch\(/);
+assert.match(html, /const STOCK_ANALYSIS_PROXIES = \[/);
+assert.match(html, /function stockAnalysisFetch\(/);
+assert.match(html, /allorigins\.hexlet\.app\/raw\?url=/);
+assert.match(html, /api\.allorigins\.win\/raw\?url=/);
+assert.match(html, /stockAnalysisFetch\(`stocks\/\$\{ticker\.toLowerCase\(\)\}\/forecast\/__data\.json`\)/);
+assert.equal((html.match(/stockAnalysisFetch\(/g) || []).length, 4);
+assert.doesNotMatch(html, /fetch\(`https:\/\/corsproxy\.io\/\?https:\/\/stockanalysis\.com/);
 assert.match(html, /function renderPriceChart\(/);
 assert.match(html, /s\.tradingview\.com\/widgetembed/);
 assert.match(html, /if \(!data\?\.quote\?\.c \|\| !data\?\.metric\)/);

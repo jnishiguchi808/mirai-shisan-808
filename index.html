@@ -243,9 +243,34 @@ const FMP_KEY = 'demo'; // Replace with your free FMP API key
 const FINNHUB_MIN_INTERVAL_MS = 1050;
 let finnhubQueue = Promise.resolve();
 let finnhubLastRequestAt = 0;
+const STOCK_ANALYSIS_PROXIES = [
+  target => `https://allorigins.hexlet.app/raw?url=${encodeURIComponent(target)}`,
+  target => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
+  target => `https://corsproxy.io/?url=${encodeURIComponent(target)}`
+];
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function stockAnalysisFetch(path) {
+  const target = `https://stockanalysis.com/${path.replace(/^\/+/, '')}`;
+  const errors = [];
+
+  for (const buildProxyUrl of STOCK_ANALYSIS_PROXIES) {
+    const proxyUrl = buildProxyUrl(target);
+    try {
+      const response = await fetch(proxyUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (!Array.isArray(data?.nodes)) throw new Error('Unexpected response payload');
+      return data;
+    } catch (error) {
+      errors.push(`${new URL(proxyUrl).hostname}: ${error.message}`);
+    }
+  }
+
+  throw new Error(`StockAnalysis unavailable (${errors.join('; ')})`);
 }
 
 function finnhubFetch(endpoint, maxAttempts = 3) {
@@ -888,30 +913,29 @@ async function fetchStockData(ticker) {
 
     // Price target (analyst Lo/Mid/Hi) from StockAnalysis
     try {
-      const saRes = await fetch(`https://corsproxy.io/?https://stockanalysis.com/stocks/${ticker.toLowerCase()}/forecast/__data.json`);
-      if (saRes.ok) {
-        const saData = await saRes.json();
-        const d = saData.nodes?.[2]?.data;
-        if (d) {
-          const ptIdx = d[0]?.priceTargets;
-          if (ptIdx !== undefined && d[ptIdx]) {
-            const pt = d[ptIdx];
-            const low = d[pt.low];
-            const median = d[pt.median] || d[pt.average];
-            const high = d[pt.high];
-            if (low && high) {
-              document.getElementById('analyst-lo').textContent = `Lo: $${Math.round(low)}`;
-              document.getElementById('analyst-mid').textContent = `Mid: $${Math.round(median)}`;
-              document.getElementById('analyst-hi').textContent = `Hi: $${Math.round(high)}`;
-              if (quote.c) {
-                const pos = ((quote.c - low) / (high - low)) * 100;
-                document.getElementById('analyst-current').style.left = `${Math.min(100,Math.max(0,pos))}%`;
-              }
+      const saData = await stockAnalysisFetch(`stocks/${ticker.toLowerCase()}/forecast/__data.json`);
+      const d = saData.nodes?.[2]?.data;
+      if (d) {
+        const ptIdx = d[0]?.priceTargets;
+        if (ptIdx !== undefined && d[ptIdx]) {
+          const pt = d[ptIdx];
+          const low = d[pt.low];
+          const median = d[pt.median] || d[pt.average];
+          const high = d[pt.high];
+          if (low && high) {
+            document.getElementById('analyst-lo').textContent = `Lo: $${Math.round(low)}`;
+            document.getElementById('analyst-mid').textContent = `Mid: $${Math.round(median)}`;
+            document.getElementById('analyst-hi').textContent = `Hi: $${Math.round(high)}`;
+            if (quote.c) {
+              const pos = ((quote.c - low) / (high - low)) * 100;
+              document.getElementById('analyst-current').style.left = `${Math.min(100,Math.max(0,pos))}%`;
             }
           }
         }
       }
-    } catch(e) { /* StockAnalysis unavailable */ }
+    } catch(e) {
+      console.warn(`Analyst targets unavailable for ${ticker}:`, e.message);
+    }
 
     // Earnings date
     const now = new Date();
@@ -1149,17 +1173,19 @@ async function fetchSingleTicker(ticker, i, tbody, navBasedFV, isETF) {
 
 async function fetchSAMain(ticker) {
   try {
-    const r = await fetch(`https://corsproxy.io/?https://stockanalysis.com/${saPath(ticker)}/${ticker.toLowerCase()}/__data.json`);
-    if (r.ok) return await r.json();
-  } catch(e) {}
+    return await stockAnalysisFetch(`${saPath(ticker)}/${ticker.toLowerCase()}/__data.json`);
+  } catch(e) {
+    console.warn(`StockAnalysis profile unavailable for ${ticker}:`, e.message);
+  }
   return null;
 }
 
 async function fetchSAForecast(ticker) {
   try {
-    const r = await fetch(`https://corsproxy.io/?https://stockanalysis.com/stocks/${ticker.toLowerCase()}/forecast/__data.json`);
-    if (r.ok) return await r.json();
-  } catch(e) {}
+    return await stockAnalysisFetch(`stocks/${ticker.toLowerCase()}/forecast/__data.json`);
+  } catch(e) {
+    console.warn(`StockAnalysis forecast unavailable for ${ticker}:`, e.message);
+  }
   return null;
 }
 
@@ -2562,7 +2588,7 @@ function renderDataSourcesPrimer(container) {
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px; font-weight:600;">CORS Proxy</td>
-            <td style="padding:6px;"><code>corsproxy.io</code> — free, no account needed</td>
+            <td style="padding:6px;"><code>allorigins.hexlet.app</code> with <code>api.allorigins.win</code> and <code>corsproxy.io</code> fallbacks — free, no account needed</td>
           </tr>
           <tr>
             <td style="padding:6px; font-weight:600;">Limitations</td>
@@ -2635,14 +2661,26 @@ function renderDataSourcesPrimer(container) {
             <th style="padding:8px; text-align:left;">Risk</th>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px;"><code>corsproxy.io</code></td>
+            <td style="padding:6px;"><code>allorigins.hexlet.app</code></td>
             <td style="padding:6px;">StockAnalysis</td>
             <td style="padding:6px;">Free</td>
-            <td style="padding:6px;">Could go down or add rate limits</td>
+            <td style="padding:6px;">Primary route; could be unreliable under heavy load</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;"><code>api.allorigins.win</code></td>
+            <td style="padding:6px;">StockAnalysis fallback</td>
+            <td style="padding:6px;">Free</td>
+            <td style="padding:6px;">Fallback only; could be unreliable under heavy load</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;"><code>corsproxy.io</code></td>
+            <td style="padding:6px;">StockAnalysis second fallback</td>
+            <td style="padding:6px;">Free</td>
+            <td style="padding:6px;">Fallback only; may block requests or add rate limits</td>
           </tr>
           <tr>
             <td style="padding:6px;"><code>api.allorigins.win</code></td>
-            <td style="padding:6px;">Macrotrends, Yahoo Finance</td>
+            <td style="padding:6px;">Macrotrends</td>
             <td style="padding:6px;">Free</td>
             <td style="padding:6px;">Open-source proxy; could be unreliable under heavy load</td>
           </tr>
@@ -2723,7 +2761,7 @@ function renderDataSourcesPrimer(container) {
         <div style="background:var(--bg-secondary); padding:16px; border-radius:8px; margin-bottom:20px;">
           <p style="margin:0 0 8px 0;"><strong>What could break and how to fix it:</strong></p>
           <ol style="margin:0; padding-left:20px;">
-            <li style="margin-bottom:8px;"><strong>CORS proxy goes down</strong> — Replace <code>corsproxy.io</code> or <code>api.allorigins.win</code> with another free proxy (e.g., <code>cors-anywhere</code>, <code>thingproxy</code>) or self-host one on Cloudflare Workers (free tier).</li>
+            <li style="margin-bottom:8px;"><strong>CORS proxy goes down</strong> — StockAnalysis requests automatically try the next configured proxy. If every route fails, add another provider to <code>STOCK_ANALYSIS_PROXIES</code> or self-host one on Cloudflare Workers (free tier).</li>
             <li style="margin-bottom:8px;"><strong>StockAnalysis changes <code>__data.json</code> structure</strong> — Their SvelteKit data format may change on redesign. Fix: inspect new JSON structure in browser DevTools and update parsing logic.</li>
             <li style="margin-bottom:8px;"><strong>Yahoo blocks the chart API</strong> — They've done this before. Fallback: use Finnhub historical candles (requires paid tier) or Alpha Vantage (free, 25 calls/day).</li>
             <li style="margin-bottom:8px;"><strong>Finnhub retires free tier</strong> — Unlikely soon, but if so: Alpha Vantage or Financial Modeling Prep are alternatives with free tiers.</li>
@@ -2816,8 +2854,8 @@ It's pure HTML/CSS/JS — no build step, no framework.
 Key architecture:
 - All watchlists are JS arrays in a WATCHLIST object near line ~234
 - Data is fetched client-side from: Finnhub (API key in code), StockAnalysis
-  (__data.json via corsproxy.io), Macrotrends (HTML scraping via allorigins),
-  Yahoo Finance (v8 chart API via allorigins)
+  (__data.json via a three-route proxy fallback helper), Macrotrends
+  (HTML scraping via allorigins), Yahoo Finance (v8 chart API direct)
 - Column order: Ticker, Signal, Price, Chg$, Chg%, Beta, P/B, P/E, 5Y P/E,
   PEG, Div%, Payout, Ex-Div, Earnings, 52W Hi, 52W Lo, FV, Analyst Lo/Mid/Hi, Vol, Links
 - localStorage caching (15-min TTL) with parallel fetch (5 concurrent)
