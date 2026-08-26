@@ -991,8 +991,8 @@ function renderWatchlist(container, category, title) {
               <th onclick="sortWatchlist(this)">Payout<span class="sort-ind"></span></th>
               <th onclick="sortWatchlist(this)">Ex-Div<span class="sort-ind"></span></th>
               <th onclick="sortWatchlist(this)">Earnings<span class="sort-ind"></span></th>
-              <th onclick="sortWatchlist(this)">52W Hi<span class="sort-ind"></span></th>
               <th onclick="sortWatchlist(this)">52W Lo<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)">52W Hi<span class="sort-ind"></span></th>
               <th onclick="sortWatchlist(this)">FV<span class="sort-ind"></span></th>
               <th onclick="sortWatchlist(this)">Analyst Lo<span class="sort-ind"></span></th>
               <th onclick="sortWatchlist(this)">Analyst Mid<span class="sort-ind"></span></th>
@@ -1386,8 +1386,8 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
     } else {
       cells[11].textContent = '—';
     }
-    cells[14].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
-    cells[15].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
+    cells[14].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
+    cells[15].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
 
     // Fair Value (FV)
     const trailingEps = m.epsNormalizedAnnual;
@@ -2798,7 +2798,7 @@ function renderDataSourcesPrimer(container) {
             <td style="padding:6px;">Ex-Div, Earnings</td><td style="padding:6px;">StockAnalysis</td><td style="padding:6px;">__data.json → exDividendDate, earningsDate</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px;">52W Hi/Lo</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/stock/metric → 52WeekHigh, 52WeekLow</td>
+            <td style="padding:6px;">52W Lo/Hi</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/stock/metric → 52WeekLow, 52WeekHigh</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px;">FV (Fair Value)</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">Computed per archetype: earnings (DCF+Graham+PEG), asset-light franchise (DCF+normalized P/E), book/ROE-justified P/B, dividend-discount, or NAV</td>
@@ -2857,7 +2857,7 @@ Key architecture:
   (__data.json via a three-route proxy fallback helper), Macrotrends
   (HTML scraping via allorigins), Yahoo Finance (v8 chart API direct)
 - Column order: Ticker, Signal, Price, Chg$, Chg%, Beta, P/B, P/E, 5Y P/E,
-  PEG, Div%, Payout, Ex-Div, Earnings, 52W Hi, 52W Lo, FV, Analyst Lo/Mid/Hi, Vol, Links
+  PEG, Div%, Payout, Ex-Div, Earnings, 52W Lo, 52W Hi, FV, Analyst Lo/Mid/Hi, Vol, Links
 - localStorage caching (15-min TTL) with parallel fetch (5 concurrent)
 - Research/primer pages are rendered by functions like renderTechAnalysis(),
   renderFairValuePrimer(), renderDividendCoveragePrimer(), renderDataSourcesPrimer()

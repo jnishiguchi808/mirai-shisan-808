@@ -38,6 +38,9 @@ assert.match(html, /function renderPriceChart\(/);
 assert.match(html, /s\.tradingview\.com\/widgetembed/);
 assert.match(html, /if \(!data\?\.quote\?\.c \|\| !data\?\.metric\)/);
 assert.match(html, /Render core quote\/metric fields immediately/);
+assert.match(html, /52W Lo[\s\S]*52W Hi[\s\S]*Analyst Lo[\s\S]*Analyst Mid[\s\S]*Analyst Hi/);
+assert.match(html, /cells\[14\]\.textContent = m\['52WeekLow'\]/);
+assert.match(html, /cells\[15\]\.textContent = m\['52WeekHigh'\]/);
 
 function between(start, end) {
   const startIndex = html.indexOf(start);
