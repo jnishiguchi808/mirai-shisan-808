@@ -9,6 +9,8 @@ assert.equal((html.match(/data-view="ai-robotics"/g) || []).length, 1);
 assert.equal((html.match(/data-view="bdc"/g) || []).length, 1);
 assert.match(html, /ai_robotics:\s*\[[^\]]*'CRDO'/);
 assert.match(html, /ai_robotics:\s*\[[^\]]*'ANET'/);
+assert.match(html, /ai_robotics:\s*\[[^\]]*'VRT'/);
+assert.match(html, /infrastructure:\s*\[[^\]]*'VRT'/);
 assert.match(html, /semiconductors:\s*\[[^\]]*'CRDO'/);
 assert.match(html, /advertising:\s*\[[^\]]*'RDDT'/);
 assert.match(html, /ai_robotics:\s*\[[^\]]*'RDDT'/);
