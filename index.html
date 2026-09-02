@@ -329,7 +329,7 @@ const WATCHLIST = {
   banking: ['BAC','BNS','C','CPF','GS','JPM','KBE','KRE','MFG','MS','MUFG','PNC','SCHW','SMFG','TD','USB','WFC','XLF'],
   bdc: ['ARCC','BXSL','GAIN','GLAD','HRZN','HTGC','MAIN','OBDC','TSLX'],
   cybersecurity: ['BUG','CIBR','CRWD','FTNT','NET','OKTA','PANW','PLTR','S','TENB','ZS'],
-  defense: ['AXON','BA','GD','HII','ITA','KTOS','LHX','LMT','NOC','PLTR','PPA','RTX','TDG','UFO'],
+  defense: ['AXON','BA','DCO','GD','HII','HONA','ITA','KTOS','LHX','LMT','MOG.A','MRCY','NOC','PLTR','PPA','RTX','TDG','UFO'],
   drones: ['ACHR','AIRO','AVAV','AVEX','BKSY','DPRO','DRNZ','EH','EVTL','JEDI','JOBY','KTOS','MBLY','ONDS','PDYN','PL','RCAT','RDW','SWMR','UAVS','UMAC','ZENA'],
   energy_new: ['AIPO','AMT','BE','BEPC','BLDP','BLNK','BWA','BWXT','CCJ','CEG','CHPT','ENPH','EVGO','FCEL','FSLR','GEV','HMC','HYLN','ICLN','LCID','LIT','MVST','NEE','NIU','NNE','NRDE','OKLO','PLUG','PWR','QS','SMR','SPRU','TLN','UEC','URA','URNM','UUUU','VST','XIFR'],
   energy_old: ['AQN','BKR','COP','CVX','DUK','DVN','ECO','EQT','ET','FANG','GNRC','HAL','HE','KMI','LB','LNG','MLPA','MLPI','MUR','NRG','OKE','OXY','PBA','PR','PSX','SLB','SMR','TTE','VNOM','XOM'],
@@ -366,6 +366,7 @@ const ETF_TICKERS = new Set([
   ...(WATCHLIST.etf_statestreet || [])
 ]);
 function saPath(t) { return ETF_TICKERS.has(t) ? 'etf' : 'stocks'; }
+function yahooTicker(ticker) { return ticker.replaceAll('.', '-'); }
 
 const MAX_USABLE_PEG = 10;
 
@@ -819,7 +820,7 @@ function chartPath(values, x, y) {
 }
 
 async function fetchYahooChart(ticker) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1y`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooTicker(ticker))}?interval=1d&range=1y`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Yahoo chart request failed (${response.status})`);
   const payload = await response.json();

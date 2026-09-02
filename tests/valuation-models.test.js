@@ -20,6 +20,7 @@ assert.match(html, /ai_robotics:\s*\[[^\]]*'ALMU'[^\]]*'QNT'[^\]]*'RGTI'/);
 assert.match(html, /energy_new:\s*\[[^\]]*'PWR'[^\]]*'TLN'/);
 assert.match(html, /energy_old:\s*\[[^\]]*'NRG'/);
 assert.doesNotMatch(html, /energy_new:\s*\[[^\]]*'COHR'/);
+assert.match(html, /defense:\s*\[[^\]]*'DCO'[^\]]*'HONA'[^\]]*'MOG\.A'[^\]]*'MRCY'/);
 assert.match(html, /semiconductors:\s*\['ALMU'/);
 assert.match(html, /quantum:\s*\['AMZN','GOOGL','HON','IBM','INFQ','INTC','IONQ','IQMX','MSFT','NVDA','QBTS','QNT','QTUM','QUBT','RGTI'\]/);
 assert.match(html, /data-view="quantum"/);
@@ -38,6 +39,8 @@ assert.match(html, /stockAnalysisFetch\(`stocks\/\$\{ticker\.toLowerCase\(\)\}\/
 assert.equal((html.match(/stockAnalysisFetch\(/g) || []).length, 4);
 assert.doesNotMatch(html, /fetch\(`https:\/\/corsproxy\.io\/\?https:\/\/stockanalysis\.com/);
 assert.match(html, /function renderPriceChart\(/);
+assert.match(html, /function yahooTicker\(ticker\) \{ return ticker\.replaceAll\('\.', '-'\); \}/);
+assert.match(html, /encodeURIComponent\(yahooTicker\(ticker\)\)/);
 assert.match(html, /s\.tradingview\.com\/widgetembed/);
 assert.match(html, /if \(!data\?\.quote\?\.c \|\| !data\?\.metric\)/);
 assert.match(html, /Render core quote\/metric fields immediately/);
