@@ -249,6 +249,31 @@ const STOCK_ANALYSIS_PROXIES = [
   target => `https://corsproxy.io/?url=${encodeURIComponent(target)}`
 ];
 
+// Yahoo's v8 chart API sends no Access-Control-Allow-Origin header, so browser
+// requests from the published origin are blocked and must be relayed. Direct is
+// attempted first so local/file usage keeps the faster unproxied path.
+const YAHOO_CHART_ROUTES = [
+  target => target,
+  target => `https://allorigins.hexlet.app/raw?url=${encodeURIComponent(target)}`,
+  target => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
+  target => `https://corsproxy.io/?url=${encodeURIComponent(target)}`
+];
+
+async function fetchJsonWithRoutes(target, routes) {
+  const errors = [];
+  for (const buildUrl of routes) {
+    const requestUrl = buildUrl(target);
+    try {
+      const response = await fetch(requestUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      errors.push(`${new URL(requestUrl).hostname}: ${error.message}`);
+    }
+  }
+  throw new Error(errors.join('; '));
+}
+
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -820,10 +845,8 @@ function chartPath(values, x, y) {
 }
 
 async function fetchYahooChart(ticker) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooTicker(ticker))}?interval=1d&range=1y`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Yahoo chart request failed (${response.status})`);
-  const payload = await response.json();
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooTicker(ticker))}?interval=1d&range=2y`;
+  const payload = await fetchJsonWithRoutes(url, YAHOO_CHART_ROUTES);
   const result = payload.chart?.result?.[0];
   const timestamps = result?.timestamp || [];
   const closes = result?.indicators?.quote?.[0]?.close || [];
@@ -1238,7 +1261,10 @@ async function fetchYahooSignal(ticker) {
         const rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
         return { price, ma50, ma200, rsi };
       }
-  } catch(e) {}
+      console.warn(`Signal skipped for ${ticker}: only ${closes.length} closes, need 200`);
+  } catch(e) {
+    console.warn(`Signal unavailable for ${ticker}:`, e.message);
+  }
   return null;
 }
 
@@ -2641,15 +2667,15 @@ function renderDataSourcesPrimer(container) {
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px; font-weight:600;">Data Used</td>
-            <td style="padding:6px;"><code>/v8/finance/chart/TICK?interval=1d&range=1y</code> — 1 year of daily closing prices → compute 50MA, 200MA, RSI(14)</td>
+            <td style="padding:6px;"><code>/v8/finance/chart/TICK?interval=1d&range=2y</code> — 2 years of daily closing prices → compute 50MA, 200MA, RSI(14)</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px; font-weight:600;">CORS Proxy</td>
-            <td style="padding:6px;"><code>api.allorigins.win</code> — free, no account needed</td>
+            <td style="padding:6px;">Direct first, then <code>allorigins.hexlet.app</code> → <code>api.allorigins.win</code> → <code>corsproxy.io</code></td>
           </tr>
           <tr>
             <td style="padding:6px; font-weight:600;">Limitations</td>
-            <td style="padding:6px;">Unofficial/undocumented — Yahoo can break or block at any time. Needs 200+ trading days of data (won't work for IPOs < 1 year old). Heavier payload (~50-100KB per ticker).</td>
+            <td style="padding:6px;">Unofficial/undocumented — Yahoo can break or block at any time. Needs 200+ trading days of data (won't work for IPOs &lt; 1 year old). Heavier payload (~100-200KB per ticker).</td>
           </tr>
         </table>
 
@@ -2663,21 +2689,21 @@ function renderDataSourcesPrimer(container) {
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px;"><code>allorigins.hexlet.app</code></td>
-            <td style="padding:6px;">StockAnalysis</td>
+            <td style="padding:6px;">StockAnalysis, Yahoo</td>
             <td style="padding:6px;">Free</td>
             <td style="padding:6px;">Primary route; could be unreliable under heavy load</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px;"><code>api.allorigins.win</code></td>
-            <td style="padding:6px;">StockAnalysis fallback</td>
+            <td style="padding:6px;">StockAnalysis, Yahoo fallback</td>
             <td style="padding:6px;">Free</td>
             <td style="padding:6px;">Fallback only; could be unreliable under heavy load</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px;"><code>corsproxy.io</code></td>
-            <td style="padding:6px;">StockAnalysis second fallback</td>
+            <td style="padding:6px;">StockAnalysis, Yahoo second fallback</td>
             <td style="padding:6px;">Free</td>
-            <td style="padding:6px;">Fallback only; may block requests or add rate limits</td>
+            <td style="padding:6px;">Fallback only; now returns 401 without an API key</td>
           </tr>
           <tr>
             <td style="padding:6px;"><code>api.allorigins.win</code></td>
@@ -2856,7 +2882,7 @@ Key architecture:
 - All watchlists are JS arrays in a WATCHLIST object near line ~234
 - Data is fetched client-side from: Finnhub (API key in code), StockAnalysis
   (__data.json via a three-route proxy fallback helper), Macrotrends
-  (HTML scraping via allorigins), Yahoo Finance (v8 chart API direct)
+  (HTML scraping via allorigins), Yahoo Finance (v8 chart API, direct then proxy fallback)
 - Column order: Ticker, Signal, Price, Chg$, Chg%, Beta, P/B, P/E, 5Y P/E,
   PEG, Div%, Payout, Ex-Div, Earnings, 52W Lo, 52W Hi, FV, Analyst Lo/Mid/Hi, Vol, Links
 - localStorage caching (15-min TTL) with parallel fetch (5 concurrent)
