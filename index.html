@@ -243,11 +243,22 @@ const FMP_KEY = 'demo'; // Replace with your free FMP API key
 const FINNHUB_MIN_INTERVAL_MS = 1050;
 let finnhubQueue = Promise.resolve();
 let finnhubLastRequestAt = 0;
+// Every non-Finnhub source is fetched through a CORS relay. See the Data
+// Sources section of the in-app docs for the full rationale.
+//
+// Route 1 is a self-hosted Cloudflare Worker (source in cloudflare-worker/).
+// It is first because we control it: origin/target allowlists, a browser-like
+// User-Agent that gets past StockAnalysis bot protection, and a 100k req/day
+// free-tier ceiling we use a fraction of. Route 2 is a public proxy kept only
+// as a backstop.
+//
+// api.allorigins.win (HTTP 522) and corsproxy.io (HTTP 401, now needs an API
+// key) were removed in Sep 2026 after both stopped working. Do not re-add a
+// public proxy without testing it first; a dead route costs a full timeout on
+// every ticker before the chain moves on.
 const STOCK_ANALYSIS_PROXIES = [
   target => `https://mirai-proxy.jay-nishiguchi.workers.dev/?url=${encodeURIComponent(target)}`,
-  target => `https://allorigins.hexlet.app/raw?url=${encodeURIComponent(target)}`,
-  target => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
-  target => `https://corsproxy.io/?url=${encodeURIComponent(target)}`
+  target => `https://allorigins.hexlet.app/raw?url=${encodeURIComponent(target)}`
 ];
 
 // Yahoo's v8 chart API sends no Access-Control-Allow-Origin header, so browser
@@ -256,9 +267,7 @@ const STOCK_ANALYSIS_PROXIES = [
 const YAHOO_CHART_ROUTES = [
   target => target,
   target => `https://mirai-proxy.jay-nishiguchi.workers.dev/?url=${encodeURIComponent(target)}`,
-  target => `https://allorigins.hexlet.app/raw?url=${encodeURIComponent(target)}`,
-  target => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
-  target => `https://corsproxy.io/?url=${encodeURIComponent(target)}`
+  target => `https://allorigins.hexlet.app/raw?url=${encodeURIComponent(target)}`
 ];
 
 async function fetchJsonWithRoutes(target, routes) {
@@ -2661,7 +2670,7 @@ function renderDataSourcesPrimer(container) {
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px; font-weight:600;">CORS Proxy</td>
-            <td style="padding:6px;"><code>allorigins.hexlet.app</code> with <code>api.allorigins.win</code> and <code>corsproxy.io</code> fallbacks — free, no account needed</td>
+            <td style="padding:6px;">Self-hosted Cloudflare Worker (<code>mirai-proxy</code>), with <code>allorigins.hexlet.app</code> as backstop</td>
           </tr>
           <tr>
             <td style="padding:6px; font-weight:600;">Limitations</td>
@@ -2689,7 +2698,7 @@ function renderDataSourcesPrimer(container) {
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px; font-weight:600;">CORS Proxy</td>
-            <td style="padding:6px;"><code>api.allorigins.win</code> — free, no account needed</td>
+            <td style="padding:6px;">Same chain as StockAnalysis (<code>STOCK_ANALYSIS_PROXIES</code>): Cloudflare Worker, then <code>allorigins.hexlet.app</code></td>
           </tr>
           <tr>
             <td style="padding:6px; font-weight:600;">Limitations</td>
@@ -2717,7 +2726,7 @@ function renderDataSourcesPrimer(container) {
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px; font-weight:600;">CORS Proxy</td>
-            <td style="padding:6px;">Direct first, then <code>allorigins.hexlet.app</code> → <code>api.allorigins.win</code> → <code>corsproxy.io</code></td>
+            <td style="padding:6px;">Direct first, then Cloudflare Worker → <code>allorigins.hexlet.app</code></td>
           </tr>
           <tr>
             <td style="padding:6px; font-weight:600;">Limitations</td>
@@ -2758,32 +2767,61 @@ function renderDataSourcesPrimer(container) {
             <th style="padding:8px; text-align:left;">Risk</th>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px;"><code>allorigins.hexlet.app</code></td>
-            <td style="padding:6px;">StockAnalysis, Yahoo</td>
+            <td style="padding:6px;"><code>mirai-proxy.jay-nishiguchi.workers.dev</code></td>
+            <td style="padding:6px;">StockAnalysis, Macrotrends, Yahoo — <strong>primary</strong></td>
             <td style="padding:6px;">Free</td>
-            <td style="padding:6px;">Primary route; could be unreliable under heavy load</td>
-          </tr>
-          <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px;"><code>api.allorigins.win</code></td>
-            <td style="padding:6px;">StockAnalysis, Yahoo fallback</td>
-            <td style="padding:6px;">Free</td>
-            <td style="padding:6px;">Fallback only; could be unreliable under heavy load</td>
-          </tr>
-          <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px;"><code>corsproxy.io</code></td>
-            <td style="padding:6px;">StockAnalysis, Yahoo second fallback</td>
-            <td style="padding:6px;">Free</td>
-            <td style="padding:6px;">Fallback only; now returns 401 without an API key</td>
+            <td style="padding:6px;">Self-hosted; we control uptime, allowlists and headers</td>
           </tr>
           <tr>
-            <td style="padding:6px;"><code>api.allorigins.win</code></td>
-            <td style="padding:6px;">Macrotrends</td>
+            <td style="padding:6px;"><code>allorigins.hexlet.app</code></td>
+            <td style="padding:6px;">All three — backstop only</td>
             <td style="padding:6px;">Free</td>
-            <td style="padding:6px;">Open-source proxy; could be unreliable under heavy load</td>
+            <td style="padding:6px;">Public proxy; unreliable under load, returns 403 for StockAnalysis</td>
           </tr>
         </table>
         <p style="color:var(--text-secondary); font-size:0.75rem;"><strong>Why proxies?</strong> Browsers enforce CORS (Cross-Origin Resource Sharing). StockAnalysis, Macrotrends, and Yahoo don't set <code>Access-Control-Allow-Origin</code> headers, so direct browser requests are blocked. These proxies relay the request server-side and add the header. Finnhub doesn't need one because their API explicitly allows browser access.</p>
-        <p style="color:var(--text-secondary); font-size:0.75rem;"><strong>⚠️ Current proxy health:</strong> as of Sep 2026 only <code>allorigins.hexlet.app</code> is working. <code>api.allorigins.win</code> returns <code>522</code> and <code>corsproxy.io</code> returns <code>401</code> (it now requires an API key). Every proxied column therefore depends on a single route — if the dashboard goes blank across many columns at once, that is the first thing to check. Add another provider to <code>STOCK_ANALYSIS_PROXIES</code> / <code>YAHOO_CHART_ROUTES</code> or self-host one on Cloudflare Workers (free tier).</p>
+        <p style="color:var(--text-secondary); font-size:0.75rem;"><strong>Pruned Sep 2026:</strong> <code>api.allorigins.win</code> (HTTP 522) and <code>corsproxy.io</code> (HTTP 401 — now requires an API key) were removed from both route arrays. A dead route is not free: each one burns a full fetch timeout per ticker before the chain advances. Do not re-add a public proxy without testing it against a live StockAnalysis URL first.</p>
+
+        <h4 style="color:var(--blue);">☁️ The Cloudflare Worker (<code>mirai-proxy</code>)</h4>
+        <p style="color:var(--text-secondary); font-size:0.8rem;">Route 1 for every proxied source. Source of truth lives in <code>cloudflare-worker/proxy.js</code> in this repo; <code>cloudflare-worker/README.md</code> has the deploy runbook. Read this before touching any proxy code.</p>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:160px;">What it is</td>
+            <td style="padding:6px;">A ~60-line Cloudflare Worker deployed to the account's free tier. It accepts <code>?url=&lt;encoded target&gt;</code>, re-fetches that URL server-side, and returns the body with <code>Access-Control-Allow-Origin</code> attached.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Why we built it</td>
+            <td style="padding:6px;">By Sep 2026 two of the three public proxies were dead and the survivor was rate-limiting, which is what produced the blank SIG / analyst-target columns. Self-hosting removes the single point of failure we do not control.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Why it beats the public proxies</td>
+            <td style="padding:6px;">It sends a browser-like <code>User-Agent</code>, which is what gets past StockAnalysis's bot protection — <code>allorigins.hexlet.app</code> passes its own UA through and gets <code>403</code> on those endpoints. It also has no shared-tenant rate limiting.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Cost</td>
+            <td style="padding:6px;"><span style="color:var(--green); font-weight:600;">$0</span>. Free tier is 100,000 requests/day. A full dashboard refresh of ~60 tickers costs roughly 180 requests, and results are cached — actual usage is a rounding error against the cap. No credit card, no paid plan.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Account</td>
+            <td style="padding:6px;">Cloudflare account signed in with the same Google identity as the GitHub account that hosts this Pages site. Nothing is stored in the repo — no tokens, no keys, no <code>wrangler.toml</code> secrets.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Security model</td>
+            <td style="padding:6px;">Two allowlists in <code>proxy.js</code>. <code>ALLOWED_HOSTS</code> restricts what can be fetched to <code>stockanalysis.com</code>, <code>macrotrends.net</code> and <code>query1/query2.finance.yahoo.com</code>, so it cannot be used as an open relay. <code>ALLOWED_ORIGINS</code> restricts who may call it to the GitHub Pages origin plus localhost. Both must be updated together if a new data source is added.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">⚠️ Do NOT enable</td>
+            <td style="padding:6px;">Cloudflare Access ("Protect with Cloudflare Access" in the deploy UI). It puts a login wall in front of the Worker; the dashboard's <code>fetch</code> calls would get an auth redirect instead of data. The origin allowlist is the correct protection here.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Redeploying</td>
+            <td style="padding:6px;">Cloudflare dashboard → Compute (Workers) → <code>mirai-proxy</code> → Edit code → paste the contents of <code>cloudflare-worker/proxy.js</code> → Deploy. The in-browser editor is read-only until the placeholder Worker has been deployed once. Changing <code>proxy.js</code> in git does <em>not</em> redeploy it — this step is manual.</td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">Health check</td>
+            <td style="padding:6px;">Hitting the bare Worker URL returns <code>Missing ?url= parameter</code> — that is success, not an error. For the deployed Worker, open it with <code>?url=https://stockanalysis.com/stocks/rddt/__data.json</code> and confirm JSON comes back. To test the handler logic locally (imports <code>proxy.js</code> directly, real upstream calls): <code>node cloudflare-worker/test-proxy.mjs</code>.</td>
+          </tr>
+        </table>
 
         <h4 style="color:var(--blue);">⚡ Caching & Performance</h4>
         <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:0.8rem;">
@@ -2952,9 +2990,17 @@ It's pure HTML/CSS/JS — no build step, no framework.
 Key architecture:
 - All watchlists are JS arrays in a WATCHLIST object near line ~234
 - Data is fetched client-side from: Finnhub (API key in code), StockAnalysis
-  (__data.json via a three-route proxy fallback helper), Macrotrends
-  (HTML scraping via allorigins), Yahoo Finance (v8 chart API, direct then proxy
-  fallback, with StockAnalysis history as a second source for the Signal column)
+  (__data.json via a two-route proxy fallback helper), Macrotrends
+  (HTML scraping via the same proxy chain), Yahoo Finance (v8 chart API, direct
+  then proxy fallback, with StockAnalysis history as a second source for the
+  Signal column)
+- CORS relay: route 1 is OUR OWN Cloudflare Worker
+  (mirai-proxy.jay-nishiguchi.workers.dev, source in cloudflare-worker/proxy.js,
+  free tier, origin + target allowlists, sends a browser UA so StockAnalysis
+  doesn't 403). Route 2 is allorigins.hexlet.app as a backstop. api.allorigins.win
+  and corsproxy.io were pruned Sep 2026 — both dead. Editing proxy.js in git does
+  NOT redeploy the Worker; paste it into the Cloudflare dashboard and hit Deploy.
+  Never enable Cloudflare Access on it — that adds a login wall and breaks fetch.
 - Column order: Ticker, Signal, Price, Chg$, Chg%, Beta, P/B, P/E, 5Y P/E,
   PEG, Div%, Payout, Ex-Div, Earnings, 52W Lo, 52W Hi, FV, Analyst Lo/Mid/Hi, Vol, Links
 - localStorage caching (15-min TTL) with parallel fetch (5 concurrent)
