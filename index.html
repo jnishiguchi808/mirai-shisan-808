@@ -244,6 +244,7 @@ const FINNHUB_MIN_INTERVAL_MS = 1050;
 let finnhubQueue = Promise.resolve();
 let finnhubLastRequestAt = 0;
 const STOCK_ANALYSIS_PROXIES = [
+  target => `https://mirai-proxy.jay-nishiguchi.workers.dev/?url=${encodeURIComponent(target)}`,
   target => `https://allorigins.hexlet.app/raw?url=${encodeURIComponent(target)}`,
   target => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
   target => `https://corsproxy.io/?url=${encodeURIComponent(target)}`
@@ -254,6 +255,7 @@ const STOCK_ANALYSIS_PROXIES = [
 // attempted first so local/file usage keeps the faster unproxied path.
 const YAHOO_CHART_ROUTES = [
   target => target,
+  target => `https://mirai-proxy.jay-nishiguchi.workers.dev/?url=${encodeURIComponent(target)}`,
   target => `https://allorigins.hexlet.app/raw?url=${encodeURIComponent(target)}`,
   target => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
   target => `https://corsproxy.io/?url=${encodeURIComponent(target)}`
@@ -267,6 +269,21 @@ async function fetchJsonWithRoutes(target, routes) {
       const response = await fetch(requestUrl);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return await response.json();
+    } catch (error) {
+      errors.push(`${new URL(requestUrl).hostname}: ${error.message}`);
+    }
+  }
+  throw new Error(errors.join('; '));
+}
+
+async function fetchTextWithRoutes(target, routes) {
+  const errors = [];
+  for (const buildUrl of routes) {
+    const requestUrl = buildUrl(target);
+    try {
+      const response = await fetch(requestUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.text();
     } catch (error) {
       errors.push(`${new URL(requestUrl).hostname}: ${error.message}`);
     }
@@ -1245,10 +1262,9 @@ async function fetchSAForecast(ticker) {
 
 async function fetchMacrotrends(ticker) {
   try {
-    const mtUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.macrotrends.net/stocks/charts/${ticker}/x/pe-ratio`)}`;
-    const r = await fetch(mtUrl);
-    if (r.ok) {
-      const html = await r.text();
+    const target = `https://www.macrotrends.net/stocks/charts/${ticker}/x/pe-ratio`;
+    const html = await fetchTextWithRoutes(target, STOCK_ANALYSIS_PROXIES);
+    {
       const peMatches = [...html.matchAll(/<td[^>]*>(\d{4}-\d{2}-\d{2})<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>([\d.]+)<\/td>/g)];
       if (peMatches.length > 0) {
         const fiveYearsAgo = new Date();
