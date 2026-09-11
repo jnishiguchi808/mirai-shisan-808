@@ -856,6 +856,36 @@ async function fetchYahooChart(ticker) {
   return points;
 }
 
+// Fallback price history. Note the range: StockAnalysis silently caps both 2Y
+// and MAX at ~252 bars, which leaves too little headroom above the 200 closes
+// the MA200 needs, so 5Y is the smallest range that reliably clears it.
+async function fetchStockAnalysisChart(ticker) {
+  const symbol = encodeURIComponent(ticker.toLowerCase());
+  const url = `https://stockanalysis.com/api/symbol/s/${symbol}/history?range=5Y&period=Daily`;
+  const payload = await fetchJsonWithRoutes(url, STOCK_ANALYSIS_PROXIES);
+  const rows = Array.isArray(payload?.data) ? payload.data : [];
+  const points = rows
+    .map(row => ({ time: row.t, close: Number.isFinite(row.a) ? row.a : row.c }))
+    .filter(point => Number.isFinite(point.close))
+    .reverse(); // API returns newest-first; MA/RSI need chronological order
+  if (points.length < 2) throw new Error('No historical prices returned');
+  return points;
+}
+
+// Yahoo first (wider 2y window, lighter payload), StockAnalysis second so a
+// single vendor outage cannot blank the SIG column.
+async function fetchPriceHistory(ticker) {
+  try {
+    return await fetchYahooChart(ticker);
+  } catch (yahooError) {
+    try {
+      return await fetchStockAnalysisChart(ticker);
+    } catch (saError) {
+      throw new Error(`Yahoo: ${yahooError.message} | StockAnalysis: ${saError.message}`);
+    }
+  }
+}
+
 async function renderPriceChart(ticker) {
   const container = document.getElementById('tv-chart');
   if (!container) return;
@@ -1179,7 +1209,7 @@ async function fetchSingleTicker(ticker, i, tbody, navBasedFV, isETF) {
       fetchSAMain(ticker),
       fetchSAForecast(ticker),
       fetchMacrotrends(ticker),
-      fetchYahooSignal(ticker),
+      fetchTechnicalSignal(ticker),
       finnhubFetch(`stock/profile2?symbol=${encodeURIComponent(ticker)}`).catch(() => null)
     ]).then(([saMain, saForecast, mtData, yfData, prof]) => {
       tickerData.saMain = saMain;
@@ -1241,9 +1271,9 @@ async function fetchMacrotrends(ticker) {
   return null;
 }
 
-async function fetchYahooSignal(ticker) {
+async function fetchTechnicalSignal(ticker) {
   try {
-    const points = await fetchYahooChart(ticker);
+    const points = await fetchPriceHistory(ticker);
     const closes = points.map(point => point.close);
       if (closes && closes.length >= 200) {
         const ma50 = closes.slice(-50).reduce((a, b) => a + b, 0) / 50;
@@ -2651,7 +2681,7 @@ function renderDataSourcesPrimer(container) {
           </tr>
         </table>
 
-        <h5 style="color:var(--green); margin-bottom:8px;">4. Yahoo Finance — Technical Signal (MA/RSI)</h5>
+        <h5 style="color:var(--green); margin-bottom:8px;">4. Yahoo Finance — Technical Signal (MA/RSI), primary</h5>
         <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px; font-weight:600; width:140px;">Website</td>
@@ -2676,6 +2706,30 @@ function renderDataSourcesPrimer(container) {
           <tr>
             <td style="padding:6px; font-weight:600;">Limitations</td>
             <td style="padding:6px;">Unofficial/undocumented — Yahoo can break or block at any time. Needs 200+ trading days of data (won't work for IPOs &lt; 1 year old). Heavier payload (~100-200KB per ticker).</td>
+          </tr>
+        </table>
+
+        <h5 style="color:var(--green); margin-bottom:8px;">4b. StockAnalysis — Technical Signal fallback</h5>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600; width:140px;">When used</td>
+            <td style="padding:6px;">Only when every Yahoo route fails. Yahoo stays primary because its 2y range returns ~502 bars in a lighter payload.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">Data Used</td>
+            <td style="padding:6px;"><code>/api/symbol/s/TICK/history?range=5Y&amp;period=Daily</code> → adjusted daily closes (field <code>a</code>, falling back to <code>c</code>)</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">CORS Proxy</td>
+            <td style="padding:6px;">Always proxied — StockAnalysis returns <code>403</code> to unproxied requests via bot protection</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px; font-weight:600;">⚠️ Range quirk</td>
+            <td style="padding:6px;"><code>range=2Y</code> and <code>range=MAX</code> <strong>silently return only ~252 bars</strong> (1 year) with no error. That leaves just 52 bars above the 200 the MA200 needs. <code>5Y</code> is the smallest range that reliably clears it (~1,255 bars) — do not "optimise" this down to 2Y.</td>
+          </tr>
+          <tr>
+            <td style="padding:6px; font-weight:600;">Known differences</td>
+            <td style="padding:6px;">Rows are returned newest-first and are reversed before use. Closes are dividend-adjusted and settle end-of-day, so an intraday signal may differ by one grade from Yahoo's (e.g. H vs B near a threshold). This is expected.</td>
           </tr>
         </table>
 
@@ -2713,6 +2767,7 @@ function renderDataSourcesPrimer(container) {
           </tr>
         </table>
         <p style="color:var(--text-secondary); font-size:0.75rem;"><strong>Why proxies?</strong> Browsers enforce CORS (Cross-Origin Resource Sharing). StockAnalysis, Macrotrends, and Yahoo don't set <code>Access-Control-Allow-Origin</code> headers, so direct browser requests are blocked. These proxies relay the request server-side and add the header. Finnhub doesn't need one because their API explicitly allows browser access.</p>
+        <p style="color:var(--text-secondary); font-size:0.75rem;"><strong>⚠️ Current proxy health:</strong> as of Sep 2026 only <code>allorigins.hexlet.app</code> is working. <code>api.allorigins.win</code> returns <code>522</code> and <code>corsproxy.io</code> returns <code>401</code> (it now requires an API key). Every proxied column therefore depends on a single route — if the dashboard goes blank across many columns at once, that is the first thing to check. Add another provider to <code>STOCK_ANALYSIS_PROXIES</code> / <code>YAHOO_CHART_ROUTES</code> or self-host one on Cloudflare Workers (free tier).</p>
 
         <h4 style="color:var(--blue);">⚡ Caching & Performance</h4>
         <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:0.8rem;">
@@ -2804,7 +2859,7 @@ function renderDataSourcesPrimer(container) {
             <th style="padding:6px; text-align:left;">Endpoint/Field</th>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px;">Signal</td><td style="padding:6px;">Yahoo Finance</td><td style="padding:6px;">v8 chart → computed 50MA/200MA/RSI</td>
+            <td style="padding:6px;">Signal</td><td style="padding:6px;">Yahoo Finance, StockAnalysis fallback</td><td style="padding:6px;">v8 chart → computed 50MA/200MA/RSI</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px;">Price, Chg$, Chg%, Vol</td><td style="padding:6px;">Finnhub</td><td style="padding:6px;">/quote → c, pc, v</td>
@@ -2882,7 +2937,8 @@ Key architecture:
 - All watchlists are JS arrays in a WATCHLIST object near line ~234
 - Data is fetched client-side from: Finnhub (API key in code), StockAnalysis
   (__data.json via a three-route proxy fallback helper), Macrotrends
-  (HTML scraping via allorigins), Yahoo Finance (v8 chart API, direct then proxy fallback)
+  (HTML scraping via allorigins), Yahoo Finance (v8 chart API, direct then proxy
+  fallback, with StockAnalysis history as a second source for the Signal column)
 - Column order: Ticker, Signal, Price, Chg$, Chg%, Beta, P/B, P/E, 5Y P/E,
   PEG, Div%, Payout, Ex-Div, Earnings, 52W Lo, 52W Hi, FV, Analyst Lo/Mid/Hi, Vol, Links
 - localStorage caching (15-min TTL) with parallel fetch (5 concurrent)
