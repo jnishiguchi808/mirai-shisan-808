@@ -176,6 +176,7 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <a href="#" data-view="agriculture" style="padding-left:28px;">Agriculture</a>
     <a href="#" data-view="ai-robotics" style="padding-left:28px;">AI+Robotics</a>
     <a href="#" data-view="alcohol_tobacco" style="padding-left:28px;">Alcohol+Tobacco</a>
+    <a href="#" data-view="asset-managers" style="padding-left:28px;">Asset Managers</a>
     <a href="#" data-view="banking" style="padding-left:28px;">Banking</a>
     <a href="#" data-view="bdc" style="padding-left:28px;">BDC</a>
     <a href="#" data-view="cybersecurity" style="padding-left:28px;">Cybersecurity</a>
@@ -377,6 +378,7 @@ const WATCHLIST = {
   agriculture: ['AGCO','ADM','CAT','DE','MOS','NTR','TSCO'],
   ai_robotics: ['AAPL','AI','AIPO','AIQ','ALMU','AMAT','AMD','AMKR','AMZN','ANET','APPN','ARTY','ASML','AVGO','BABA','BOTZ','CRDO','CRM','DUOL','DY','FN','GOOGL','HNHPF','IBM','INTC','IOT','IREN','ISRG','LRCX','MBLY','META','MSFT','NOW','NVDA','PATH','PDYN','PLTR','QCOM','QNT','RDDT','RGTI','ROBT','SMCI','SNOW','SOUN','STRL','TSM','VRT'],
   alcohol_tobacco: ['BTI','BUD','DEO','JAPAY','MO','PM','SAM','STZ','TAP'],
+  assetmgmt: ['AMG','AMP','APAM','APO','ARES','BAM','BEN','BLK','BN','BX','CG','FHI','HLNE','IVZ','JHG','KKR','OWL','SEIC','STEP','TPG','TROW','VCTR','VRTS'],
   banking: ['BAC','BNS','C','CPF','GS','JPM','KBE','KRE','MFG','MS','MUFG','PNC','SCHW','SMFG','TD','USB','WFC','XLF'],
   bdc: ['ARCC','BXSL','GAIN','GLAD','HRZN','HTGC','MAIN','OBDC','TSLX'],
   cybersecurity: ['BUG','CIBR','CRWD','FTNT','NET','OKTA','PANW','PLTR','S','TENB','ZS'],
@@ -395,7 +397,7 @@ const WATCHLIST = {
   fintech: ['AFRM','APPS','ARKF','AXP','CBOE','COIN','FICO','FVRR','HOOD','IBIT','INTU','MA','MBGL','MQ','NU','PAGS','PAYC','PSFE','PYPL','RIOT','SE','SHOP','SNOW','SOFI','SPGI','STNE','TIGR','UPST','V','XYZ'],
   gambling: ['BYD','CHDN','CZR','DKNG','FLUT','GLPI','MCRI','MGM','MLCO','RRR','VICI','WYNN'],
   housing: ['CARR','DHI','HD','LEN','LPX','NAIL','OPEN','TREX','WHR','Z'],
-  infrastructure: ['ACM','AIPO','BAM','BIPC','BN','DY','EME','FIX','PWR','RSG','STRL','VRT','WM'],
+  infrastructure: ['ACM','AIPO','BIPC','DY','EME','FIX','PWR','RSG','STRL','VRT','WM'],
   insurance: ['AFL','LMND','MET','PRU','SIGI','UNH','UNM','UPST'],
   logistics: ['AMKBY','CHRW','CSX','DAC','DHLGY','FDX','GNK','GSL','JBHT','MATX','NSC','ODFL','RXO','SBLK','UNP','UPS','XPO','ZIM'],
   medical: ['ABBV','ABT','ARKG','BMY','BSX','CVS','DXCM','FLGT','GDRX','GH','GILD','HIMS','ISRG','JNJ','LGND','LLY','MRK','MRNA','OPRX','PFE','SNY','TAK','TMDX','TMO','UNH','VCEL','VEEV'],
@@ -486,6 +488,9 @@ const ARCHETYPE_OVERRIDES = (() => {
   // Asset-value pass-throughs → pure NAV
   tag(WATCHLIST.reit, 'nav');
   tag(WATCHLIST.bdc, 'nav');
+  // Asset managers earn recurring fees on AUM they don't own; the balance sheet is not
+  // the earning asset, so book value is a poor anchor. Must precede banking — first tag wins.
+  tag(WATCHLIST.assetmgmt, 'franchise');
   // Banks & brokers → ROE-justified P/B (ETFs in the list are caught by the isETF check first)
   tag(WATCHLIST.banking, 'book');
   // Traditional insurance carriers → book (managed-care/insurtech left as earnings)
@@ -730,6 +735,7 @@ function loadView(view) {
     case 'agriculture': renderWatchlist(main, 'agriculture', 'Agriculture Watchlist'); break;
     case 'ai-robotics': renderWatchlist(main, 'ai_robotics', 'AI+Robotics Watchlist'); break;
     case 'alcohol_tobacco': renderWatchlist(main, 'alcohol_tobacco', 'Alcohol+Tobacco Watchlist'); break;
+    case 'asset-managers': renderWatchlist(main, 'assetmgmt', 'Asset Managers Watchlist'); break;
     case 'banking': renderWatchlist(main, 'banking', 'Banking Watchlist'); break;
     case 'bdc': renderWatchlist(main, 'bdc', 'BDC Watchlist'); break;
     case 'cybersecurity': renderWatchlist(main, 'cybersecurity', 'Cybersecurity Watchlist'); break;
