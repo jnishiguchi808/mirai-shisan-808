@@ -5,18 +5,35 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
-assert.equal((html.match(/data-view="ai-robotics"/g) || []).length, 1);
+const aiWatchlists = {
+  ai_platforms_sw: ['AI','AMZN','APPN','BABA','CRM','DUOL','GOOGL','IBM','IOT','META','MSFT','NOW','PATH','PLTR','RDDT','SNOW','SOUN'],
+  ai_semiconductors: ['ALMU','AMAT','AMD','AMKR','ASML','AVGO','INTC','LRCX','NVDA','QCOM','TSM'],
+  ai_infrastructure: ['ANET','CRDO','DELL','DY','FN','HNHPF','HPE','IREN','SMCI','STRL','VRT'],
+  ai_automation: ['AAPL','ISRG','MBLY','PDYN'],
+  ai_etfs: ['AIPO','AIQ','ARTY','BOTZ','ROBT']
+};
+
+function watchlistTickers(key) {
+  const match = html.match(new RegExp(`${key}:\\s*\\[([^\\]]*)\\]`));
+  assert.ok(match, `Missing watchlist: ${key}`);
+  return [...match[1].matchAll(/'([^']+)'/g)].map(item => item[1]);
+}
+
+for (const [key, tickers] of Object.entries(aiWatchlists)) {
+  assert.deepEqual(watchlistTickers(key), tickers);
+}
+const aiTickers = Object.values(aiWatchlists).flat();
+assert.equal(aiTickers.length, 48);
+assert.equal(new Set(aiTickers).size, 48);
+assert.ok(!aiTickers.includes('QNT'));
+assert.ok(!aiTickers.includes('RGTI'));
+assert.doesNotMatch(html, /ai_robotics:/);
+assert.equal((html.match(/data-view="ai-(?:platforms-sw|semiconductors|infrastructure|automation|etfs)"/g) || []).length, 5);
+assert.match(html, /\.\.\.\(WATCHLIST\.ai_etfs \|\| \[\]\)/);
 assert.equal((html.match(/data-view="bdc"/g) || []).length, 1);
-assert.match(html, /ai_robotics:\s*\[[^\]]*'CRDO'/);
-assert.match(html, /ai_robotics:\s*\[[^\]]*'ANET'/);
-assert.match(html, /ai_robotics:\s*\[[^\]]*'VRT'/);
 assert.match(html, /infrastructure:\s*\[[^\]]*'VRT'/);
 assert.match(html, /semiconductors:\s*\[[^\]]*'CRDO'/);
 assert.match(html, /advertising:\s*\[[^\]]*'RDDT'/);
-assert.match(html, /ai_robotics:\s*\[[^\]]*'RDDT'/);
-assert.match(html, /ai_robotics:\s*\[[^\]]*'BABA'/);
-assert.match(html, /ai_robotics:\s*\[[^\]]*'MBLY'[^\]]*'PDYN'/);
-assert.match(html, /ai_robotics:\s*\[[^\]]*'ALMU'[^\]]*'QNT'[^\]]*'RGTI'/);
 assert.match(html, /energy_new:\s*\[[^\]]*'PWR'[^\]]*'TLN'/);
 assert.match(html, /energy_old:\s*\[[^\]]*'NRG'/);
 assert.doesNotMatch(html, /energy_new:\s*\[[^\]]*'COHR'/);

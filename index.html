@@ -174,7 +174,11 @@ body { background:var(--bg-primary); color:var(--text-primary); font-family:'Int
     <div class="section-label">Watchlists</div>
     <a href="#" data-view="advertising" style="padding-left:28px;">Advertising</a>
     <a href="#" data-view="agriculture" style="padding-left:28px;">Agriculture</a>
-    <a href="#" data-view="ai-robotics" style="padding-left:28px;">AI+Robotics</a>
+    <a href="#" data-view="ai-platforms-sw" style="padding-left:28px;">AI+Robotics (Platforms &amp; SW)</a>
+    <a href="#" data-view="ai-semiconductors" style="padding-left:28px;">AI+Robotics (Semiconductors)</a>
+    <a href="#" data-view="ai-infrastructure" style="padding-left:28px;">AI+Robotics (Infrastructure)</a>
+    <a href="#" data-view="ai-automation" style="padding-left:28px;">AI+Robotics (Automation)</a>
+    <a href="#" data-view="ai-etfs" style="padding-left:28px;">AI+Robotics (ETFs)</a>
     <a href="#" data-view="alcohol_tobacco" style="padding-left:28px;">Alcohol+Tobacco</a>
     <a href="#" data-view="asset-managers" style="padding-left:28px;">Asset Managers</a>
     <a href="#" data-view="banking" style="padding-left:28px;">Banking</a>
@@ -376,7 +380,11 @@ loadFXRates();
 const WATCHLIST = {
   advertising: ['APP','APPS','DV','GOOGL','META','MGNI','PINS','PUBM','RDDT','ROKU','SNAP','TTD'],
   agriculture: ['AGCO','ADM','CAT','DE','MOS','NTR','TSCO'],
-  ai_robotics: ['AAPL','AI','AIPO','AIQ','ALMU','AMAT','AMD','AMKR','AMZN','ANET','APPN','ARTY','ASML','AVGO','BABA','BOTZ','CRDO','CRM','DELL','DUOL','DY','FN','GOOGL','HNHPF','HPE','IBM','INTC','IOT','IREN','ISRG','LRCX','MBLY','META','MSFT','NOW','NVDA','PATH','PDYN','PLTR','QCOM','QNT','RDDT','RGTI','ROBT','SMCI','SNOW','SOUN','STRL','TSM','VRT'],
+  ai_platforms_sw: ['AI','AMZN','APPN','BABA','CRM','DUOL','GOOGL','IBM','IOT','META','MSFT','NOW','PATH','PLTR','RDDT','SNOW','SOUN'],
+  ai_semiconductors: ['ALMU','AMAT','AMD','AMKR','ASML','AVGO','INTC','LRCX','NVDA','QCOM','TSM'],
+  ai_infrastructure: ['ANET','CRDO','DELL','DY','FN','HNHPF','HPE','IREN','SMCI','STRL','VRT'],
+  ai_automation: ['AAPL','ISRG','MBLY','PDYN'],
+  ai_etfs: ['AIPO','AIQ','ARTY','BOTZ','ROBT'],
   alcohol_tobacco: ['BTI','BUD','DEO','JAPAY','MO','PM','SAM','STZ','TAP'],
   assetmgmt: ['AMG','AMP','APAM','APO','ARES','BAM','BEN','BLK','BN','BX','CG','FHI','HLNE','IVZ','JHG','KKR','OWL','SEIC','STEP','TPG','TROW','VCTR','VRTS'],
   banking: ['BAC','BNS','C','CPF','GS','JPM','KBE','KRE','MFG','MS','MUFG','PNC','SCHW','SMFG','TD','USB','WFC','XLF'],
@@ -416,7 +424,7 @@ const WATCHLIST = {
 const ETF_TICKERS = new Set([
   ...(WATCHLIST.etfs || []), ...(WATCHLIST.etf_sp500 || []), ...(WATCHLIST.etf_russell || []),
   ...(WATCHLIST.etf_yieldmax || []), ...(WATCHLIST.fidelity || []), ...(WATCHLIST.vanguard || []),
-  ...(WATCHLIST.etf_statestreet || [])
+  ...(WATCHLIST.etf_statestreet || []), ...(WATCHLIST.ai_etfs || [])
 ]);
 function saPath(t) { return ETF_TICKERS.has(t) ? 'etf' : 'stocks'; }
 function yahooTicker(ticker) { return ticker.replaceAll('.', '-'); }
@@ -733,7 +741,11 @@ function loadView(view) {
     case 'watchlist': renderWatchlist(main, 'equities', 'Stocks Watchlist'); break;
     case 'advertising': renderWatchlist(main, 'advertising', 'Advertising Watchlist'); break;
     case 'agriculture': renderWatchlist(main, 'agriculture', 'Agriculture Watchlist'); break;
-    case 'ai-robotics': renderWatchlist(main, 'ai_robotics', 'AI+Robotics Watchlist'); break;
+    case 'ai-platforms-sw': renderWatchlist(main, 'ai_platforms_sw', 'AI+Robotics (Platforms & SW) Watchlist'); break;
+    case 'ai-semiconductors': renderWatchlist(main, 'ai_semiconductors', 'AI+Robotics (Semiconductors) Watchlist'); break;
+    case 'ai-infrastructure': renderWatchlist(main, 'ai_infrastructure', 'AI+Robotics (Infrastructure) Watchlist'); break;
+    case 'ai-automation': renderWatchlist(main, 'ai_automation', 'AI+Robotics (Automation) Watchlist'); break;
+    case 'ai-etfs': renderWatchlist(main, 'ai_etfs', 'AI+Robotics (ETFs) Watchlist'); break;
     case 'alcohol_tobacco': renderWatchlist(main, 'alcohol_tobacco', 'Alcohol+Tobacco Watchlist'); break;
     case 'asset-managers': renderWatchlist(main, 'assetmgmt', 'Asset Managers Watchlist'); break;
     case 'banking': renderWatchlist(main, 'banking', 'Banking Watchlist'); break;
