@@ -132,6 +132,8 @@ assert.equal(archetypeContext.getArchetype('SBUX', false, 'Hotels, Restaurants &
 assert.equal(archetypeContext.getArchetype('JPM', false, 'Banking'), 'book');
 assert.equal(archetypeContext.getArchetype('O', false, 'Real Estate'), 'nav');
 assert.equal(archetypeContext.getArchetype('XOM', false, 'Oil & Gas'), 'cyclical');
+assert.equal(archetypeContext.getArchetype('PAA', false, 'Oil & Gas'), 'yield');
+assert.equal(archetypeContext.getArchetype('PAGP', false, 'Oil & Gas'), 'yield');
 assert.equal(archetypeContext.getArchetype('SPY', true, 'Exchange Traded Fund'), 'etf');
 
 console.log('valuation regression tests passed');
