@@ -893,10 +893,20 @@ async function fetchYahooChart(ticker) {
   const payload = await fetchJsonWithRoutes(url, YAHOO_CHART_ROUTES);
   const result = payload.chart?.result?.[0];
   const timestamps = result?.timestamp || [];
-  const closes = result?.indicators?.quote?.[0]?.close || [];
-  const points = timestamps.map((time, index) => ({ time, close: closes[index] }))
-    .filter(point => Number.isFinite(point.close));
-  if (points.length < 2) throw new Error('No historical prices returned');
+  const quote = result?.indicators?.quote?.[0] || {};
+  const regular = result?.meta?.currentTradingPeriod?.regular;
+  const now = Date.now() / 1000;
+  const points = timestamps.map((time, index) => ({
+    time,
+    close: quote.close?.[index],
+    high: quote.high?.[index],
+    low: quote.low?.[index],
+    // Without session metadata, only a bar at least 24 hours old is final.
+    complete: Number.isFinite(regular?.start) && Number.isFinite(regular?.end)
+      ? time < regular.start || now >= regular.end
+      : time + 86400 <= now
+  }));
+  if (points.filter(point => Number.isFinite(point.close)).length < 2) throw new Error('No historical prices returned');
   return points;
 }
 
@@ -1080,6 +1090,8 @@ function renderWatchlist(container, category, title) {
               <th onclick="sortWatchlist(this)">Price<span class="sort-ind"></span></th>
               <th onclick="sortWatchlist(this)">Chg $<span class="sort-ind"></span></th>
               <th onclick="sortWatchlist(this)">Chg %<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)" title="Wilder ATR over 14 completed daily trading bars">ATR(14) $<span class="sort-ind"></span></th>
+              <th onclick="sortWatchlist(this)" title="ATR(14) divided by the last completed daily close">ATR(14) %<span class="sort-ind"></span></th>
               <th onclick="sortWatchlist(this)">Beta<span class="sort-ind"></span></th>
               <th onclick="sortWatchlist(this)">P/B<span class="sort-ind"></span></th>
               <th onclick="sortWatchlist(this)">P/E<span class="sort-ind"></span></th>
@@ -1103,7 +1115,7 @@ function renderWatchlist(container, category, title) {
             ${tickers.map((t, i) => `
               <tr data-idx="${i}">
                 <td class="ticker-cell" onclick="loadStockView('${t}')">${t}</td>
-                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                ${'<td>—</td>'.repeat(22)}
                 <td><a href="https://stockanalysis.com/${saPath(t)}/${t.toLowerCase()}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">SA</a> · <a href="https://www.macrotrends.net/stocks/charts/${t}/x/stock-price-history" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">MT</a> · <a href="https://finance.yahoo.com/quote/${t}/" target="_blank" style="color:var(--blue); text-decoration:none; font-size:0.7rem;">Y!</a></td>
               </tr>
             `).join('')}
@@ -1123,14 +1135,14 @@ function renderWatchlist(container, category, title) {
 function cellSortValue(cell, col) {
   const t = (cell.textContent || '').trim();
   if (t === '' || t === '—' || t === '-') return { e: 1 };
-  // Date columns: Ex-Div (12), Earnings (13) rendered as MM/DD/YY
-  if (col === 12 || col === 13) {
+  // Date columns: Ex-Div (14), Earnings (15) rendered as MM/DD/YY
+  if (col === 14 || col === 15) {
     const m = t.match(/(\d{2})\/(\d{2})\/(\d{2})/);
     if (m) return { n: new Date(2000 + (+m[3]), (+m[1]) - 1, +m[2]).getTime() };
     return { e: 1 };
   }
-  // Volume (20): 1.2M / 300K / 500
-  if (col === 20) {
+  // Volume (22): 1.2M / 300K / 500
+  if (col === 22) {
     const m = t.match(/([\d.]+)\s*([MK]?)/i);
     if (m) { let v = parseFloat(m[1]); if (/m/i.test(m[2])) v *= 1e6; else if (/k/i.test(m[2])) v *= 1e3; return { n: v }; }
     return { e: 1 };
@@ -1176,18 +1188,20 @@ function applySort(th, dir) {
 
 // --- Cache utilities (localStorage, 15-min TTL) ---
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const CACHE_VERSION = 2;
 function cacheGet(key) {
   try {
     const raw = localStorage.getItem('ms808_' + key);
     if (!raw) return null;
-    const { data, ts } = JSON.parse(raw);
+    const { data, ts, version } = JSON.parse(raw);
+    if (version !== CACHE_VERSION) { localStorage.removeItem('ms808_' + key); return null; }
     if (Date.now() - ts > CACHE_TTL) { localStorage.removeItem('ms808_' + key); return null; }
     if (!data?.quote?.c || !data?.metric) { localStorage.removeItem('ms808_' + key); return null; }
     return data;
   } catch(e) { return null; }
 }
 function cacheSet(key, data) {
-  try { localStorage.setItem('ms808_' + key, JSON.stringify({ data, ts: Date.now() })); } catch(e) {}
+  try { localStorage.setItem('ms808_' + key, JSON.stringify({ data, ts: Date.now(), version: CACHE_VERSION })); } catch(e) {}
 }
 
 // --- Parallel fetch with concurrency limiter ---
@@ -1314,10 +1328,46 @@ async function fetchMacrotrends(ticker) {
   return null;
 }
 
+function calculateATR(points, period = 14) {
+  const bars = points.filter(point => point.complete !== false);
+  let previousClose = null, atr = null, count = 0, total = 0;
+  for (const bar of bars) {
+    if (![bar.high, bar.low, bar.close].every(Number.isFinite) ||
+        bar.low <= 0 || bar.high < bar.low || bar.close < bar.low || bar.close > bar.high) {
+      previousClose = null;
+      atr = null;
+      count = 0;
+      total = 0;
+      continue;
+    }
+    if (previousClose !== null) {
+      const trueRange = Math.max(bar.high - bar.low, Math.abs(bar.high - previousClose), Math.abs(bar.low - previousClose));
+      count++;
+      if (count <= period) {
+        total += trueRange;
+        if (count === period) atr = total / period;
+      } else {
+        atr = (atr * (period - 1) + trueRange) / period;
+      }
+    }
+    previousClose = bar.close;
+  }
+  if (atr === null) throw new Error(`ATR(${period}) needs ${period + 1} consecutive completed daily high/low/close bars`);
+  const last = bars[bars.length - 1];
+  return { atr, atrPercent: atr / last.close * 100, atrClose: last.close, atrTime: last.time };
+}
+
 async function fetchTechnicalSignal(ticker) {
   try {
     const points = await fetchPriceHistory(ticker);
-    const closes = points.map(point => point.close);
+    const technical = { atr: null, atrPercent: null, atrError: '' };
+    try {
+      Object.assign(technical, calculateATR(points));
+    } catch (error) {
+      technical.atrError = error.message;
+      console.warn(`ATR unavailable for ${ticker}:`, error.message);
+    }
+    const closes = points.map(point => point.close).filter(Number.isFinite);
       if (closes && closes.length >= 200) {
         const ma50 = closes.slice(-50).reduce((a, b) => a + b, 0) / 50;
         const ma200 = closes.slice(-200).reduce((a, b) => a + b, 0) / 200;
@@ -1332,9 +1382,10 @@ async function fetchTechnicalSignal(ticker) {
         const avgGain = gains / period;
         const avgLoss = losses / period;
         const rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
-        return { price, ma50, ma200, rsi };
+        return { ...technical, price, ma50, ma200, rsi };
       }
       console.warn(`Signal skipped for ${ticker}: only ${closes.length} closes, need 200`);
+      return technical;
   } catch(e) {
     console.warn(`Signal unavailable for ${ticker}:`, e.message);
   }
@@ -1345,6 +1396,16 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
   const row = tbody.querySelector(`tr[data-idx="${i}"]`) || tbody.children[i];
   if (!row) return;
   const cells = row.cells;
+
+  const technical = data.yahoo;
+  const atrAvailable = Number.isFinite(technical?.atr) && Number.isFinite(technical?.atrPercent);
+  cells[5].textContent = atrAvailable ? `$${technical.atr.toFixed(2)}` : '—';
+  cells[6].textContent = atrAvailable ? `${technical.atrPercent.toFixed(2)}%` : '—';
+  const atrTitle = atrAvailable
+    ? `Yahoo Finance | Wilder ATR(14), completed daily bars through ${new Date(technical.atrTime * 1000).toISOString().slice(0, 10)} | ATR % = ATR / closing price $${technical.atrClose.toFixed(2)}`
+    : technical?.atrError || 'ATR unavailable: daily high/low/close history is loading or could not be retrieved';
+  cells[5].title = atrTitle;
+  cells[6].title = atrTitle;
 
   // Quote data
   const q = data.quote;
@@ -1359,7 +1420,7 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
     cells[4].className = isUp ? 'up' : 'down';
     if (q.v) {
       const vol = q.v >= 1e6 ? `${(q.v/1e6).toFixed(1)}M` : q.v >= 1e3 ? `${(q.v/1e3).toFixed(0)}K` : `${q.v}`;
-      cells[20].textContent = vol;
+      cells[22].textContent = vol;
     }
   }
 
@@ -1374,19 +1435,19 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
       if (exDivIdx !== undefined && d[exDivIdx]) {
         const exDate = new Date(d[exDivIdx]);
         const exFmt = !isNaN(exDate) ? `${(exDate.getMonth()+1).toString().padStart(2,'0')}/${exDate.getDate().toString().padStart(2,'0')}/${exDate.getFullYear().toString().slice(-2)}` : d[exDivIdx];
-        cells[12].textContent = exFmt;
+        cells[14].textContent = exFmt;
         if (!isNaN(exDate)) {
           const daysUntil = Math.ceil((exDate - new Date()) / (1000*60*60*24));
-          if (daysUntil >= 0 && daysUntil <= 7) cells[12].innerHTML = `<span class="highlight-soon">${exFmt}</span>`;
+          if (daysUntil >= 0 && daysUntil <= 7) cells[14].innerHTML = `<span class="highlight-soon">${exFmt}</span>`;
         }
       }
       // Div%: ETF pages expose a preformatted `dividendYield` (e.g. "3.22%"); stocks use Finnhub instead
       const dyIdx = d[0].dividendYield;
-      if (dyIdx !== undefined && d[dyIdx]) cells[10].textContent = d[dyIdx];
+      if (dyIdx !== undefined && d[dyIdx]) cells[12].textContent = d[dyIdx];
       const edIdx = d[0].earningsDate;
       if (edIdx !== undefined && d[edIdx]) {
         const edDate = new Date(d[edIdx]);
-        cells[13].textContent = !isNaN(edDate) ? `${(edDate.getMonth()+1).toString().padStart(2,'0')}/${edDate.getDate().toString().padStart(2,'0')}/${edDate.getFullYear().toString().slice(-2)}` : d[edIdx];
+        cells[15].textContent = !isNaN(edDate) ? `${(edDate.getMonth()+1).toString().padStart(2,'0')}/${edDate.getDate().toString().padStart(2,'0')}/${edDate.getFullYear().toString().slice(-2)}` : d[edIdx];
       }
     }
   }
@@ -1402,9 +1463,9 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
         const median = d[pt.median] || d[pt.average];
         const high = d[pt.high];
         if (low && high) {
-          cells[17].textContent = `$${Math.round(low)}`;
-          cells[18].textContent = `$${Math.round(median)}`;
-          cells[19].textContent = `$${Math.round(high)}`;
+          cells[19].textContent = `$${Math.round(low)}`;
+          cells[20].textContent = `$${Math.round(median)}`;
+          cells[21].textContent = `$${Math.round(high)}`;
         }
       }
       // Extract forward EPS consensus (for FV calculation)
@@ -1431,7 +1492,7 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
   // Finnhub metrics
   const m = data.metric;
   if (m) {
-    cells[5].textContent = m.beta?.toFixed(2) || '—';
+    cells[7].textContent = m.beta?.toFixed(2) || '—';
     // P/B calculated from live price / latest book value for consistency
     // Convert book value from local currency to USD for foreign ADRs
     const profileCcy = data.profile?.currency;
@@ -1440,11 +1501,11 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
     const priceForPB = parseFloat(cells[2].textContent.replace('$',''));
     if (bookVal && bookVal > 0 && priceForPB > 0) {
       const pb = (priceForPB / bookVal).toFixed(2);
-      cells[6].innerHTML = `<span title="Price $${priceForPB.toFixed(2)} / Book $${bookVal.toFixed(2)}${fxRate > 1 ? ' (converted from '+profileCcy+')' : ''}">${pb}</span>`;
+      cells[8].innerHTML = `<span title="Price $${priceForPB.toFixed(2)} / Book $${bookVal.toFixed(2)}${fxRate > 1 ? ' (converted from '+profileCcy+')' : ''}">${pb}</span>`;
     } else {
-      cells[6].textContent = '—';
+      cells[8].textContent = '—';
     }
-    cells[7].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
+    cells[9].textContent = m.peNormalizedAnnual?.toFixed(1) || '—';
     const pegInfo = getValidatedPeg(m, priceForPB, data._forwardEPS, data._forwardEPSNext);
     const peg = pegInfo.value;
     const growth = m.epsGrowthTTMYoy;
@@ -1461,15 +1522,15 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
       const growthStr = growth ? `${growth > 0 ? '+' : ''}${growth.toFixed(0)}% EPS growth YoY` : 'Growth data unavailable';
       const growthNote = peg < 0.5 && growth > 100 ? `${pegWarning}${growthStr} (cyclical?)` : growthStr;
       const tipText = `${pegInfo.tooltip} | ${growthNote}`;
-      cells[9].innerHTML = `<span style="color:${pegColor}" title="${tipText}">${peg.toFixed(2)}</span>`;
+      cells[11].innerHTML = `<span style="color:${pegColor}" title="${tipText}">${peg.toFixed(2)}</span>`;
     } else if (pegInfo.source) {
-      cells[9].innerHTML = `<span style="color:var(--yellow)" title="${pegInfo.tooltip}">N/M</span>`;
+      cells[11].innerHTML = `<span style="color:var(--yellow)" title="${pegInfo.tooltip}">N/M</span>`;
     } else {
-      cells[9].textContent = '—';
+      cells[11].textContent = '—';
     }
     // Div%: Finnhub for stocks; ETFs keep the StockAnalysis value set above
-    if (m.dividendYieldIndicatedAnnual) cells[10].textContent = `${m.dividendYieldIndicatedAnnual.toFixed(2)}%`;
-    else if (!isETF) cells[10].textContent = '—';
+    if (m.dividendYieldIndicatedAnnual) cells[12].textContent = `${m.dividendYieldIndicatedAnnual.toFixed(2)}%`;
+    else if (!isETF) cells[12].textContent = '—';
     // Payout Ratio (FCF-based)
     const dps = m.dividendPerShareAnnual;
     const cfps = m.cashFlowPerShareTTM;
@@ -1480,14 +1541,14 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
       else if (payout > 75) payColor = 'var(--yellow)';
       const epsPayout = m.payoutRatioTTM ? `EPS Payout: ${m.payoutRatioTTM.toFixed(0)}%` : '';
       const tipText = `FCF Payout: ${payout.toFixed(0)}% (DPS: $${dps.toFixed(2)} / CFPS: $${cfps.toFixed(2)})${epsPayout ? ' | ' + epsPayout : ''}`;
-      cells[11].innerHTML = `<span style="color:${payColor}" title="${tipText}">${payout.toFixed(0)}%</span>`;
+      cells[13].innerHTML = `<span style="color:${payColor}" title="${tipText}">${payout.toFixed(0)}%</span>`;
     } else if (dps && dps > 0) {
-      cells[11].innerHTML = `<span style="color:var(--red)" title="No cash flow data available">n/a</span>`;
+      cells[13].innerHTML = `<span style="color:var(--red)" title="No cash flow data available">n/a</span>`;
     } else {
-      cells[11].textContent = '—';
+      cells[13].textContent = '—';
     }
-    cells[14].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
-    cells[15].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
+    cells[16].textContent = m['52WeekLow'] ? `$${m['52WeekLow'].toFixed(2)}` : '—';
+    cells[17].textContent = m['52WeekHigh'] ? `$${m['52WeekHigh'].toFixed(2)}` : '—';
 
     // Fair Value (FV)
     const trailingEps = m.epsNormalizedAnnual;
@@ -1528,28 +1589,28 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
 
     if (isETF) {
       // ETFs: FV not applicable — arbitrage keeps price ≈ NAV
-      cells[16].innerHTML = `<span style="color:var(--text-secondary);" title="FV not applicable for ETFs (price = NAV by design)">—</span>`;
+      cells[18].innerHTML = `<span style="color:var(--text-secondary);" title="FV not applicable for ETFs (price = NAV by design)">—</span>`;
     } else if (archetype === 'nav' && bookVal && bookVal > 0 && currentPrice > 0) {
       // NAV-based FV for BDCs/REITs — fair value = book value (NAV)
       const gap = ((bookVal - currentPrice) / currentPrice * 100).toFixed(0);
       const fvColor = bookVal > currentPrice * 1.05 ? 'var(--green)' : bookVal < currentPrice * 0.95 ? 'var(--red)' : 'var(--text-primary)';
       const pb = (currentPrice / bookVal).toFixed(2);
       const tipText = `NAV-based: Book Value $${bookVal.toFixed(2)} | P/B: ${pb}x | ${gap > 0 ? '+' : ''}${gap}% vs price [Method: NAV / book value | Confidence: High]`;
-      cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${bookVal.toFixed(0)}</span>`;
+      cells[18].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${bookVal.toFixed(0)}</span>`;
     } else if (bookFV) {
       // Banks / insurers — ROE-justified P/B (earnings-growth models understate financials)
       const fv = bookFV.fv;
       const gap = ((fv - currentPrice) / currentPrice * 100).toFixed(0);
       const fvColor = fv > currentPrice * 1.1 ? 'var(--green)' : fv < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
       const tipText = `Justified P/B ${bookFV.fairPB.toFixed(2)}x = (ROE ${(bookFV.roe * 100).toFixed(1)}% − g 4%) / (r 10% − g 4%); FV = price × (fair P/B ÷ actual P/B ${bookFV.pbActual.toFixed(2)}x) → $${fv.toFixed(0)} | ${gap > 0 ? '+' : ''}${gap}% vs price [Method: Book / ROE-justified P/B | Confidence: Medium]`;
-      cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${fv.toFixed(0)}</span>`;
+      cells[18].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${fv.toFixed(0)}</span>`;
     } else if (ddmFV) {
       // Utilities / telecom / MLPs — Gordon dividend-discount model
       const fv = ddmFV.fv;
       const gap = ((fv - currentPrice) / currentPrice * 100).toFixed(0);
       const fvColor = fv > currentPrice * 1.1 ? 'var(--green)' : fv < currentPrice * 0.9 ? 'var(--red)' : 'var(--text-primary)';
       const tipText = `Gordon DDM: yield ${(ddmFV.y * 100).toFixed(2)}% × (1+g) / (r − g), r ${(ddmFV.r * 100).toFixed(0)}%, g ${(ddmFV.g * 100).toFixed(0)}% → $${fv.toFixed(0)} | ${gap > 0 ? '+' : ''}${gap}% vs price [Method: Dividend-discount | Confidence: Medium]`;
-      cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${fv.toFixed(0)}</span>`;
+      cells[18].innerHTML = `<span style="color:${fvColor};" title="${tipText}">$${fv.toFixed(0)}</span>`;
     } else if (!eps) {
       // No usable EPS from any source — show N/A with explanation
       const reasons = [];
@@ -1557,7 +1618,7 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
       if (fwdEPSNext !== undefined && fwdEPSNext !== null) reasons.push(`Fwd+1 EPS: $${Number(fwdEPSNext).toFixed(2)}`);
       if (trailingEps !== undefined && trailingEps !== null) reasons.push(`TTM EPS: $${Number(trailingEps).toFixed(2)}`);
       const tipText = `FV unavailable — all EPS sources are ≤ 0 or missing. ${reasons.length ? reasons.join(', ') : 'No EPS data found.'}. Earnings-based models cannot value pre-profit or loss-making companies.`;
-      cells[16].innerHTML = `<span style="color:var(--yellow);" title="${tipText}">N/A</span>`;
+      cells[18].innerHTML = `<span style="color:var(--yellow);" title="${tipText}">N/A</span>`;
     } else if (eps > 0) {
       let models = [];
       let tips = [];
@@ -1587,7 +1648,7 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
           const confidence = epsSource === 'Fwd' && growthSource === 'Fwd' ? 'High' : 'Medium';
           const fxNote = fxApplied ? `, FX: ${fxApplied}→USD` : '';
           const tipStr = `DCF(5yr): $${franchiseFV.dcfFV.toFixed(0)} | Normalized P/E ${franchiseFV.normalizedPE.toFixed(1)}x: $${franchiseFV.multipleFV.toFixed(0)} | Blend (25/75): $${fv.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [Franchise Model | EPS: $${eps.toFixed(2)} ${epsSource}${fxNote} | Growth: ${growthPct.toFixed(1)}% ${growthSource} | Method: Asset-light franchise earnings | Confidence: ${confidence}]`;
-          cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${fv.toFixed(0)}</span>`;
+          cells[18].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${fv.toFixed(0)}</span>`;
         }
       } else {
       // Two-tier model: Growth (P/E > 25) vs Value (P/E ≤ 25)
@@ -1620,7 +1681,7 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
         const fxNote = fxApplied ? `, FX: ${fxApplied}→USD` : '';
         const cycNote = isCyclical ? ' ⚠ Cyclical: trailing EPS distorts earnings models — treat as rough; use mid-cycle normalized EPS.' : '';
         const tipStr = tips.join(' | ') + ` | Blend: $${blended.toFixed(0)} (${gap > 0 ? '+' : ''}${gap}%) [${modelTier} Model | EPS: $${eps.toFixed(2)} ${epsSource}${fxNote} | Growth: ${growthPct.toFixed(1)}% ${growthSource} | Method: ${method} | Confidence: ${confidence}]${cycNote}`;
-        cells[16].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
+        cells[18].innerHTML = `<span style="color:${fvColor};" title="${tipStr}">$${blended.toFixed(0)}</span>`;
       }
       }
     }
@@ -1629,20 +1690,20 @@ function applyTickerData(data, i, tbody, ticker, navBasedFV, isETF) {
   // 5Y P/E (Macrotrends)
   if (data.macrotrends && data.macrotrends.median5Y) {
     const median5Y = data.macrotrends.median5Y;
-    const currentPE = parseFloat(cells[7].textContent);
+    const currentPE = parseFloat(cells[9].textContent);
     const mtLink = `https://www.macrotrends.net/stocks/charts/${ticker}/x/pe-ratio`;
     if (currentPE && currentPE > 0) {
       const dev = ((currentPE - median5Y) / median5Y * 100).toFixed(0);
       const color = dev > 0 ? 'var(--red)' : 'var(--green)';
       const sign = dev > 0 ? '+' : '';
-      cells[8].innerHTML = `<a href="${mtLink}" target="_blank" style="color:${color}; text-decoration:none;">${median5Y.toFixed(1)} (${sign}${dev}%)</a>`;
+      cells[10].innerHTML = `<a href="${mtLink}" target="_blank" style="color:${color}; text-decoration:none;">${median5Y.toFixed(1)} (${sign}${dev}%)</a>`;
     } else {
-      cells[8].innerHTML = `<a href="${mtLink}" target="_blank" style="color:var(--text-secondary); text-decoration:none;">${median5Y.toFixed(1)}</a>`;
+      cells[10].innerHTML = `<a href="${mtLink}" target="_blank" style="color:var(--text-secondary); text-decoration:none;">${median5Y.toFixed(1)}</a>`;
     }
   }
 
   // Technical Signal (Yahoo)
-  if (data.yahoo) {
+  if (Number.isFinite(data.yahoo?.ma200)) {
     const { price, ma50, ma200, rsi } = data.yahoo;
     let signal = 'H', sigColor = 'var(--yellow)';
     if (price > ma50 && ma50 > ma200 && rsi < 70) {
@@ -2724,7 +2785,7 @@ function renderDataSourcesPrimer(container) {
           </tr>
         </table>
 
-        <h5 style="color:var(--green); margin-bottom:8px;">4. Yahoo Finance — Technical Signal (MA/RSI), primary</h5>
+        <h5 style="color:var(--green); margin-bottom:8px;">4. Yahoo Finance — Technical Signal (MA/RSI) and ATR(14), primary</h5>
         <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.8rem;">
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px; font-weight:600; width:140px;">Website</td>
@@ -2740,7 +2801,7 @@ function renderDataSourcesPrimer(container) {
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px; font-weight:600;">Data Used</td>
-            <td style="padding:6px;"><code>/v8/finance/chart/TICK?interval=1d&range=2y</code> — 2 years of daily closing prices → compute 50MA, 200MA, RSI(14)</td>
+            <td style="padding:6px;"><code>/v8/finance/chart/TICK?interval=1d&range=2y</code> — 2 years of daily prices → compute 50MA, 200MA, RSI(14), and ATR(14). ATR uses high, low, and previous close, including overnight gaps; its first value averages 14 true ranges, then uses Wilder smoothing: (prior ATR × 13 + true range) / 14. Only completed regular-session daily bars are used. ATR(14) % = ATR / last completed daily close × 100; both sortable columns follow Chg % in every watchlist. Hover for the date and closing-price basis.</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px; font-weight:600;">CORS Proxy</td>
@@ -2748,7 +2809,7 @@ function renderDataSourcesPrimer(container) {
           </tr>
           <tr>
             <td style="padding:6px; font-weight:600;">Limitations</td>
-            <td style="padding:6px;">Unofficial/undocumented — Yahoo can break or block at any time. Needs 200+ trading days of data (won't work for IPOs &lt; 1 year old). Heavier payload (~100-200KB per ticker).</td>
+            <td style="padding:6px;">Unofficial/undocumented — Yahoo can break or block at any time. The signal needs 200+ trading days; ATR only needs 15 consecutive completed high/low/close bars and can appear for newer listings. Missing/invalid bars restart ATR warm-up. If session metadata is missing, bars less than 24 hours old are excluded conservatively. ATR is unavailable (—, with a tooltip) when Yahoo OHLC history fails: the StockAnalysis fallback supplies closes only, not ATR. Heavier payload (~100-200KB per ticker).</td>
           </tr>
         </table>
 
